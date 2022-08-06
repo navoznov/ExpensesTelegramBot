@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using ExpensesTelegramBot.Services;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
@@ -41,7 +42,7 @@ namespace ExpensesTelegramBot.Telegram
             // Send cancellation request to stop bot
             cts.Cancel();
 
-            async Task HandleUpdateAsync(ITelegramBotClient _botClient, Update update, CancellationToken cancellationToken)
+            async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
             {
                 // Only process Message updates: https://core.telegram.org/bots/api#message
                 if (update.Message is not { } message)
@@ -53,28 +54,30 @@ namespace ExpensesTelegramBot.Telegram
                 var chatId = message.Chat.Id;
 
                 var expenseParser = new ExpenseParser();
-                (bool Success, Expense? Expense) value = expenseParser.TryParse(messageText);
-            
-                Console.WriteLine($"Received a '{messageText}' message in chat {chatId}.");
-
-                var prefix = messageText.StartsWith("/") ? "Your command:" : "You said:";
+                var (success, expense)  = expenseParser.TryParse(messageText);
+                var text = $"You said: {messageText}"; 
+                if (success)
+                {
+                    text = $"Parsed expense: {expense!.Money} {expense.Description}";
+                }
+                
                 // Echo received message text
-                Message sentMessage = await _botClient.SendTextMessageAsync(
+                var sentMessage = await botClient.SendTextMessageAsync(
                     chatId: chatId,
-                    text: prefix + "\n" + messageText,
+                    text: text,
                     cancellationToken: cancellationToken);
             }
 
-            Task HandlePollingErrorAsync(ITelegramBotClient _botClient, Exception exception, CancellationToken cancellationToken)
+            Task HandlePollingErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
             {
-                var ErrorMessage = exception switch
+                var errorMessage = exception switch
                 {
                     ApiRequestException apiRequestException
                         => $"Telegram API Error:\n[{apiRequestException.ErrorCode}]\n{apiRequestException.Message}",
                     _ => exception.ToString()
                 };
 
-                Console.WriteLine(ErrorMessage);
+                Console.WriteLine(errorMessage);
                 return Task.CompletedTask;
             }
         }

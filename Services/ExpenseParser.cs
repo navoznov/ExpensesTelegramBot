@@ -1,43 +1,34 @@
-using System;
 using System.Text.RegularExpressions;
 
-public class ExpenseParser
+namespace ExpensesTelegramBot.Services
 {
-    public (bool Success, Expense? Expense) TryParse(string input)
+    public class ExpenseParser
     {
-        var pattern = @"(\d+[KkMm]?) *(.+)?";
+        public (bool Success, Expense? Expense) TryParse(string input)
+        {
+            var pattern = @"(?<money>\d+)(?<multiplier>[KkMm]?) *(?<description>.+)?";
 
-        var regex = new Regex(pattern);
+            var regex = new Regex(pattern);
 
-        var matches = regex.Matches(input.Trim());
-        foreach(var match in matches){
-            Console.WriteLine();
+            var match = regex.Match(input.Trim());
+            if (!match.Success)
+            {
+                return (false, null);
+            }
+
+            var moneyStr = match.Groups["money"]?.Value;
+
+            if (!decimal.TryParse(moneyStr, out var money))
+            {
+                return (false, null);
+            }
+        
+            var multiplierStr = match.Groups["multiplier"]?.Value;
+            var multiplier = multiplierStr?.ToUpper() == "K" ? 1_000 : 1;
+        
+            var descriptionStr = match.Groups["description"]?.Value.Trim();
+            var expense = new Expense(money* multiplier, descriptionStr);
+            return (true, expense);
         }
-
-        return (false, null);
-
-        // input = input.Trim();
-        // var parts = input.Split(" ", StringSplitOptions.RemoveEmptyEntries);
-        // if (!parts.Any())
-        // {
-        //     return (false, null);
-        // }
-
-        // var firstSpaceIndex = input.IndexOf(' ');
-        // if (firstSpaceIndex == -1)
-        // {
-        //     return (false, null);
-        // }
-
-        // var moneyPart = input.Substring(0, firstSpaceIndex);
-        // var thousandsSuffixes = new[] { 'K', 'k' };
-        // var multiplier = 1;
-        // if (thousandsSuffixes.Contains(moneyPart[-1]))
-        // {
-        //     multiplier = 1_000;
-        // }
-        // if(!decimal.TryParse(moneyPart.Substring(0, moneyPart.Length -1), out var money)){
-        //     return (false, null);
-        // }
     }
 }
