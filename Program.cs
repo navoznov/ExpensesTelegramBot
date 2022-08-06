@@ -1,5 +1,7 @@
-﻿
-namespace HelloWorld
+﻿using System.Threading.Tasks;
+using ExpensesTelegramBot.Telegram;
+
+namespace ExpensesTelegramBot
 {
     class Program
     {
