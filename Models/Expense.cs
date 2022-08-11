@@ -20,5 +20,9 @@ namespace ExpensesTelegramBot.Models
             Money = money;
             Description = description;
         }
+
+        public Expense()
+        {
+        }
     }
 }
