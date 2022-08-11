@@ -1,7 +1,7 @@
 ﻿FROM mcr.microsoft.com/dotnet/runtime:3.1-bullseye-slim-arm64v8 AS base
 WORKDIR /app
 
-FROM mcr.microsoft.com/dotnet/sdk:3.1 AS build
+FROM mcr.microsoft.com/dotnet/core/sdk:3.1 AS build
 WORKDIR /src
 COPY ["ExpensesTelegramBot.csproj", "./"]
 RUN dotnet restore "ExpensesTelegramBot.csproj"
