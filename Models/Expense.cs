@@ -1,14 +1,24 @@
 using System;
+using CsvHelper.Configuration.Attributes;
 
-public class Expense
+namespace ExpensesTelegramBot.Models
 {
-    public decimal Money { get; set; }
-    public string? Description { get; set; }
-    public DateTime Date { get; set; } = DateTime.Now.Date;
-
-    public Expense(decimal money, string? description)
+    public class Expense
     {
-        Money = money;
-        Description = description;
+        [Index(0)]
+        [Format("yyyy-MM-dd")]
+        public DateTime Date { get; set; } = DateTime.Now.Date;
+    
+        [Index(1)]
+        public decimal Money { get; set; }
+    
+        [Index(2)]
+        public string? Description { get; set; }
+
+        public Expense(decimal money, string? description)
+        {
+            Money = money;
+            Description = description;
+        }
     }
 }
