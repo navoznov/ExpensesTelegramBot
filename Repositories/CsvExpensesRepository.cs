@@ -10,7 +10,7 @@ namespace ExpensesTelegramBot.Repositories
 {
     public class CsvExpensesRepository : IExpensesRepository
     {
-        private readonly CsvConfiguration _csvConfiguration = new(CultureInfo.InvariantCulture)
+        private readonly CsvConfiguration _csvConfiguration = new CsvConfiguration(CultureInfo.InvariantCulture)
         {
             Delimiter = ";",
             HasHeaderRecord = false,

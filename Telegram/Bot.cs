@@ -53,11 +53,18 @@ namespace ExpensesTelegramBot.Telegram
                 CancellationToken cancellationToken)
             {
                 // Only process Message updates: https://core.telegram.org/bots/api#message
-                if (update.Message is not { } message)
+                var message = update.Message;
+                if (message is null)
+                {
                     return;
+                }
+                
                 // Only process text messages
-                if (message.Text is not { } messageText)
+                var messageText = message.Text;
+                if (messageText is null)
+                {
                     return;
+                }
 
                 var chatId = message.Chat.Id;
                 string text;
