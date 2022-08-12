@@ -18,10 +18,12 @@ namespace ExpensesTelegramBot.Telegram
     {
         readonly TelegramBotClient _botClient;
         private readonly IExpensesRepository _expensesRepository;
+        private readonly IUpdateHandler _updateHandler;
 
         public Bot(string token)
         {
             _botClient = new TelegramBotClient(token);
+            _updateHandler = new UpdateHandler(new CsvExpensesRepository(), new ExpenseParser());
             _expensesRepository = new CsvExpensesRepository();
         }
 
@@ -35,7 +37,7 @@ namespace ExpensesTelegramBot.Telegram
                 AllowedUpdates = Array.Empty<UpdateType>() // receive all update types
             };
             _botClient.StartReceiving(
-                updateHandler: HandleUpdateAsync,
+                updateHandler: _updateHandler.HandleUpdateAsync,
                 pollingErrorHandler: HandlePollingErrorAsync,
                 receiverOptions: receiverOptions,
                 cancellationToken: cts.Token
@@ -48,48 +50,7 @@ namespace ExpensesTelegramBot.Telegram
 
             // Send cancellation request to stop bot
             cts.Cancel();
-
-            async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update,
-                CancellationToken cancellationToken)
-            {
-                // Only process Message updates: https://core.telegram.org/bots/api#message
-                var message = update.Message;
-                if (message is null)
-                {
-                    return;
-                }
-                
-                // Only process text messages
-                var messageText = message.Text;
-                if (messageText is null)
-                {
-                    return;
-                }
-
-                var chatId = message.Chat.Id;
-                string text;
-                if (messageText.StartsWith("/"))
-                {
-                    if (messageText.ToLower() == "/getall")
-                    {
-                        await SendAllExpensesByCurrentMonth(botClient, chatId, cancellationToken);
-                    }
-                    
-                    return;
-                }
-
-                var expenseParser = new ExpenseParser();
-                var (success, expense) = expenseParser.TryParse(messageText);
-                text = $"You said: {messageText}";
-                if (success)
-                {
-                    text = $"Parsed expense: {expense!.Money} {expense.Description}";
-                    _expensesRepository.Save(expense!);
-                }
-
-                await botClient.SendTextMessageAsync(chatId: chatId, text: text, cancellationToken: cancellationToken);
-            }
-
+            
             Task HandlePollingErrorAsync(ITelegramBotClient botClient, Exception exception,
                 CancellationToken cancellationToken)
             {

@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using CsvHelper;
 using CsvHelper.Configuration;
 using ExpensesTelegramBot.Models;
@@ -35,12 +37,43 @@ namespace ExpensesTelegramBot.Repositories
 
             using var reader = new StreamReader(fileName);
             using var csv = new CsvReader(reader, _csvConfiguration);
-            return csv.GetRecords<Expense>()
-                .Where(e => e.Date.Year == year && e.Date.Month == month)
+            return GetExpensesFromFile(fileName)
                 .OrderBy(e => e.Date)
                 .ToArray();
         }
 
+        public Expense[] GetLastExpenses(int count)
+        {
+            var fileNames = new DirectoryInfo(".").GetFiles().Select(fi => fi.Name).ToArray();
+            
+            var regex = new Regex(@"^\d\d\d\d-\d\d\.csv$");
+            var test = regex.IsMatch("1233-34.csv");
+            var matchedFileNames = fileNames.Where(fn => regex.IsMatch(fn))
+                .OrderBy(fn => fn)
+                .ToArray();
+            var result = new List<Expense>();
+            foreach (var fileName in matchedFileNames)
+            {
+                var allFileRecords = GetExpensesFromFile(fileName);
+                var expensesToResult = allFileRecords
+                    .OrderByDescending(e => e.Date)
+                    .Take(count - result.Count);
+                result.AddRange(expensesToResult);
+                if (result.Count == count)
+                {
+                    break;
+                }
+            }
+
+            return result.ToArray();
+        }
+
+        Expense[] GetExpensesFromFile(string fileName)
+        {
+            using var reader = new StreamReader(fileName);
+            using var csv = new CsvReader(reader, _csvConfiguration);
+            return csv.GetRecords<Expense>().ToArray();
+        }
         private static string GetFileName(int year, int month)
         {
             const string FILE_NAME_PATTERN = "yyyy-MM";
