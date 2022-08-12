@@ -61,7 +61,7 @@ namespace ExpensesTelegramBot.Telegram
                 {
                     var fields = command.Split(" ", StringSplitOptions.RemoveEmptyEntries);
                     // /sum
-                    if (fields.Length == 1)
+                    if (fields.Length == 1)         // /sum
                     {
                         var now = DateTime.Now;
                         var sum = GetExpensesSum(now.Year, now.Month);
@@ -69,8 +69,17 @@ namespace ExpensesTelegramBot.Telegram
                         return;
                     }
                     
-                    // /sum 2022 08
-                    if (fields.Length == 3)
+                    if (fields.Length == 2)    // /sum 8
+                    {
+                        var monthStr = fields[1];
+                        if (int.TryParse(monthStr, out var month) && month >=1 && month <= 12)
+                        {
+                            var sum = GetExpensesSum(DateTime.Now.Year, month);
+                            await botClient.SendTextMessageAsync(chatId, text: sum.ToString(), cancellationToken: cancellationToken);
+                            return;
+                        }
+                    }
+                    else if (fields.Length == 3)    // /sum 2022 8
                     {
                         var yearStr = fields[1];
                         var monthStr = fields[2];
