@@ -3,7 +3,7 @@ using ExpensesTelegramBot.Models;
 
 namespace ExpensesTelegramBot.Services
 {
-    public class ExpenseParser
+    public class ExpenseParser : IExpenseParser
     {
         public (bool Success, Expense? Expense) TryParse(string input)
         {
