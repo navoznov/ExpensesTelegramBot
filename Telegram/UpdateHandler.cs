@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection.Metadata;
 using System.Text;
 using System.Threading;
@@ -47,13 +48,50 @@ namespace ExpensesTelegramBot.Telegram
                 {
                     const int COUNT = 5;
                     await SendLastExpenses(botClient, chatId, COUNT, cancellationToken);
-                }
-                else if (command.ToLower() == "getall")
-                {
-                    await SendAllExpensesByCurrentMonth(botClient, chatId, cancellationToken);
+                    return;
                 }
 
-                return;
+                if (command == "getall")
+                {
+                    await SendAllExpensesByCurrentMonth(botClient, chatId, cancellationToken);
+                    return;
+                }
+
+                if (command.StartsWith("sum"))
+                {
+                    var fields = command.Split(" ", StringSplitOptions.RemoveEmptyEntries);
+                    // /sum
+                    if (fields.Length == 1)         // /sum
+                    {
+                        var now = DateTime.Now;
+                        var sum = GetExpensesSum(now.Year, now.Month);
+                        await botClient.SendTextMessageAsync(chatId, text: sum.ToString(), cancellationToken: cancellationToken);
+                        return;
+                    }
+                    
+                    if (fields.Length == 2)    // /sum 8
+                    {
+                        var monthStr = fields[1];
+                        if (int.TryParse(monthStr, out var month) && month >=1 && month <= 12)
+                        {
+                            var sum = GetExpensesSum(DateTime.Now.Year, month);
+                            await botClient.SendTextMessageAsync(chatId, text: sum.ToString(), cancellationToken: cancellationToken);
+                            return;
+                        }
+                    }
+                    else if (fields.Length == 3)    // /sum 2022 8
+                    {
+                        var yearStr = fields[1];
+                        var monthStr = fields[2];
+                        if (int.TryParse(yearStr, out var year) && year > 2000 && year < 2100
+                            && int.TryParse(monthStr, out var month) && month >=1 && month <= 12)
+                        {
+                            var sum = GetExpensesSum(year, month);
+                            await botClient.SendTextMessageAsync(chatId, text: sum.ToString(), cancellationToken: cancellationToken);
+                            return;
+                        }
+                    }
+                }
             }
 
             var (success, expense) = _expenseParser.TryParse(messageText);
@@ -67,7 +105,7 @@ namespace ExpensesTelegramBot.Telegram
             await botClient.SendTextMessageAsync(chatId: chatId, text: answerText,
                 cancellationToken: cancellationToken);
         }
-        
+
         private async Task SendAllExpensesByCurrentMonth(ITelegramBotClient botClient, long chatId,
             CancellationToken cancellationToken)
         {
@@ -107,6 +145,12 @@ namespace ExpensesTelegramBot.Telegram
             }
 
             return stringBuilder.ToString();
+        }
+        
+        private decimal GetExpensesSum(int year, int month)
+        {
+            var expenses = _expensesRepository.GetAll(year, month);
+            return expenses.Sum(e => e.Money);
         }
     }
 }
