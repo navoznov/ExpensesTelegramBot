@@ -12,16 +12,27 @@ namespace ExpensesTelegramBot.Repositories
 {
     public class CsvExpensesRepository : IExpensesRepository
     {
+        private const string CSV_FILES_STORAGE_FOLDER_NAME = "data";
+        
         private readonly CsvConfiguration _csvConfiguration = new CsvConfiguration(CultureInfo.InvariantCulture)
         {
             Delimiter = ";",
             HasHeaderRecord = false,
         };
 
+        public CsvExpensesRepository()
+        {
+            if (!Directory.Exists(CSV_FILES_STORAGE_FOLDER_NAME))
+            {
+                Directory.CreateDirectory(CSV_FILES_STORAGE_FOLDER_NAME);
+            }
+        }
+
         public void Save(Expense expense)
         {
             var fileName = GetFileName(expense.Date.Year, expense.Date.Month);
-            using var stream = File.Open(fileName, FileMode.Append);
+            var filePath = GetFilePath(fileName);
+            using var stream = File.Open(filePath, FileMode.Append);
             using var writer = new StreamWriter(stream);
             using var csv = new CsvWriter(writer, _csvConfiguration);
             csv.WriteRecords(new[] {expense});
@@ -68,19 +79,22 @@ namespace ExpensesTelegramBot.Repositories
             return result.ToArray();
         }
 
-        Expense[] GetExpensesFromFile(string fileName)
+        private static string GetFileName(int year, int month)
+        {
+            var date = new DateTime(year, month, 1);
+            return $"{date:yyyy-MM}.csv";
+        }
+        
+        private static string GetFilePath(string fileName)
+        {
+            return Path.Combine(CSV_FILES_STORAGE_FOLDER_NAME, fileName);
+        }
+
+        private Expense[] GetExpensesFromFile(string fileName)
         {
             using var reader = new StreamReader(fileName);
             using var csv = new CsvReader(reader, _csvConfiguration);
             return csv.GetRecords<Expense>().ToArray();
-        }
-        private static string GetFileName(int year, int month)
-        {
-            const string FILE_NAME_PATTERN = "yyyy-MM";
-            var date = new DateTime(year, month, 1);
-            var dateStr = date.ToString(FILE_NAME_PATTERN);
-            var fileName = $"{dateStr}.csv";
-            return fileName;
         }
     }
 }
