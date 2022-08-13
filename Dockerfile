@@ -15,4 +15,6 @@ RUN dotnet publish "ExpensesTelegramBot.csproj" -c Release -o /app/publish
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+# create directory for csv files
+RUN mkdir data 
 ENTRYPOINT ["dotnet", "ExpensesTelegramBot.dll"]
