@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection.Metadata;
 using System.Text;
@@ -8,8 +9,11 @@ using System.Threading.Tasks;
 using ExpensesTelegramBot.Models;
 using ExpensesTelegramBot.Repositories;
 using ExpensesTelegramBot.Services;
+using ExpensesTelegramBot.Telegram.CommandHandlers;
 using Telegram.Bot;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.InputFiles;
+using File = System.IO.File;
 
 namespace ExpensesTelegramBot.Telegram
 {
@@ -54,6 +58,22 @@ namespace ExpensesTelegramBot.Telegram
                 if (command == "getall")
                 {
                     await SendAllExpensesByCurrentMonth(botClient, chatId, cancellationToken);
+                    return;
+                }
+
+                if (command.StartsWith("export"))
+                {
+                    var exportCommandHandler = new ExportCommandHandler(_expensesRepository);
+                    var exportFileName = exportCommandHandler.Handle(command);
+                    await using Stream stream = File.OpenRead(exportFileName);
+                    var inputOnlineFile = new InputOnlineFile(content: stream, fileName: exportFileName);
+                    await botClient.SendDocumentAsync(
+                        chatId: chatId,
+                        document: inputOnlineFile,
+                        replyToMessageId: message.MessageId,
+                        caption: "Expenses day by day for the month", 
+                        cancellationToken: cancellationToken);
+                    File.Delete(exportFileName);
                     return;
                 }
 
