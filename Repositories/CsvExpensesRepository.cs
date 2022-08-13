@@ -13,7 +13,7 @@ namespace ExpensesTelegramBot.Repositories
     public class CsvExpensesRepository : IExpensesRepository
     {
         private const string CSV_FILES_STORAGE_FOLDER_NAME = "data";
-        
+
         private readonly CsvConfiguration _csvConfiguration = new CsvConfiguration(CultureInfo.InvariantCulture)
         {
             Delimiter = ";",
@@ -60,7 +60,7 @@ namespace ExpensesTelegramBot.Repositories
             var regex = new Regex(@"^\d\d\d\d-\d\d\.csv$");
             var test = regex.IsMatch("1233-34.csv");
             var matchedFileNames = fileNames.Where(fn => regex.IsMatch(fn))
-                .OrderBy(fn => fn)
+                .OrderByDescending(fn => fn)
                 .ToArray();
             var result = new List<Expense>();
             foreach (var fileName in matchedFileNames)
