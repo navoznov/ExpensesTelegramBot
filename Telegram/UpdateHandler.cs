@@ -118,12 +118,12 @@ namespace ExpensesTelegramBot.Telegram
             var answerText = "Parsing error";
             if (success)
             {
-                answerText = $"Parsed expense: {expense!.Money} {expense.Description}";
-                _expensesRepository.Save(expense!);
+                answerText = $"Parsed expense:\n{expense!.Date:yyyy MMM} => {expense.Money} {expense.Description}";
+                _expensesRepository.Save(expense);
             }
 
             await botClient.SendTextMessageAsync(chatId: chatId, text: answerText,
-                cancellationToken: cancellationToken);
+                replyToMessageId: message.MessageId, cancellationToken: cancellationToken);
         }
 
         private async Task SendAllExpensesByCurrentMonth(ITelegramBotClient botClient, long chatId,
