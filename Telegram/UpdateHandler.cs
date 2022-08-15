@@ -22,11 +22,14 @@ namespace ExpensesTelegramBot.Telegram
     {
         private readonly IExpensesRepository _expensesRepository;
         private readonly IExpenseParser _expenseParser;
+        private readonly IExpensePrinter _expensePrinter;
 
-        public UpdateHandler(IExpensesRepository expensesRepository, IExpenseParser expenseParser)
+        public UpdateHandler(IExpensesRepository expensesRepository, IExpenseParser expenseParser,
+            IExpensePrinter expensePrinter)
         {
             _expensesRepository = expensesRepository;
             _expenseParser = expenseParser;
+            _expensePrinter = expensePrinter;
         }
 
         public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
@@ -67,7 +70,7 @@ namespace ExpensesTelegramBot.Telegram
                 }
                 else if (command.StartsWith("export"))
                 {
-                    var exportCommandHandler = new ExportCommandHandler(_expensesRepository);
+                    var exportCommandHandler = new ExportCommandHandler(_expensesRepository, _expensePrinter);
                     var exportFileName = exportCommandHandler.Handle(command);
                     await using Stream stream = File.OpenRead(exportFileName);
                     var inputOnlineFile = new InputOnlineFile(stream, exportFileName);
@@ -140,7 +143,6 @@ namespace ExpensesTelegramBot.Telegram
         private async Task SendLastExpenses(ITelegramBotClient botClient, long chatId, int count,
             CancellationToken cancellationToken)
         {
-            var now = DateTime.Now;
             var expenses = _expensesRepository.GetLastExpenses(count);
             var text = GetExpensesText(expenses);
 
