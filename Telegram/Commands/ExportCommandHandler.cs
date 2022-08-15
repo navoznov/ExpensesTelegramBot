@@ -3,14 +3,13 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text;
 using CsvHelper;
 using CsvHelper.Configuration;
 using ExpensesTelegramBot.Models;
 using ExpensesTelegramBot.Repositories;
 using Navoznov.DotNetHelpers.Extensions;
 
-namespace ExpensesTelegramBot.Telegram.CommandHandlers
+namespace ExpensesTelegramBot.Telegram.Commands
 {
     public class ExportCommandHandler 
     {

@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using ExpensesTelegramBot.Models;
 using ExpensesTelegramBot.Repositories;
 using ExpensesTelegramBot.Services;
-using ExpensesTelegramBot.Telegram.CommandHandlers;
+using ExpensesTelegramBot.Telegram.Commands;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;

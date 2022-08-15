@@ -1,7 +1,7 @@
 using System.IO;
 using System.Threading.Tasks;
 
-namespace ExpensesTelegramBot.Telegram.CommandHandlers
+namespace ExpensesTelegramBot.Telegram.Commands
 {
     public class HelpCommandHandler
     {
