@@ -10,4 +10,12 @@
     <PackageReference Include="Navoznov.DotNetHelpers" Version="0.0.3" />
     <PackageReference Include="Telegram.Bot" Version="18.0.0" />
   </ItemGroup>
+  <ItemGroup>
+    <None Remove="Resources\commandsHelp.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Resources\Help\helpCommand.md">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 </Project>
