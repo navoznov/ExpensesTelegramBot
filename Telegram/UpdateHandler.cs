@@ -11,6 +11,7 @@ using ExpensesTelegramBot.Repositories;
 using ExpensesTelegramBot.Services;
 using ExpensesTelegramBot.Telegram.Commands;
 using ExpensesTelegramBot.Telegram.Commands.Export;
+using ExpensesTelegramBot.Telegram.Commands.Sum;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -83,39 +84,20 @@ namespace ExpensesTelegramBot.Telegram
                     
                     File.Delete(exportFileName);
                 }
-                else if (command.StartsWith("sum"))
+                else if (command.StartsWith(SumCommandInput.NAME))
                 {
-                    var fields = command.Split(" ", StringSplitOptions.RemoveEmptyEntries);
-                    // /sum
-                    if (fields.Length == 1)         // /sum
+                    var argsStr = command[SumCommandInput.NAME.Length..];
+                    var text = "Command arguments parsing error";
+                    if(SumCommandInput.TryParse(argsStr, out var sumCommandInput))
                     {
-                        var now = DateTime.Now;
-                        var sum = GetExpensesSum(now.Year, now.Month);
-                        await botClient.SendTextMessageAsync(chatId, text: sum.ToString(), cancellationToken: cancellationToken);
+                        var sumCommand = new SumCommand(sumCommandInput!, _expensesRepository);
+                        var commandTextResult = sumCommand.Execute();
+                        text = commandTextResult.Text;
                     }
-                    
-                    if (fields.Length == 2)         // /sum 8
-                    {
-                        var monthStr = fields[1];
-                        if (int.TryParse(monthStr, out var month) && month >=1 && month <= 12)
-                        {
-                            var sum = GetExpensesSum(DateTime.Now.Year, month);
-                            var text = sum.ToString();
-                            await botClient.SendTextMessageAsync(chatId, text, cancellationToken: cancellationToken);
-                        }
-                    }
-                    else if (fields.Length == 3)    // /sum 2022 8
-                    {
-                        var yearStr = fields[1];
-                        var monthStr = fields[2];
-                        if (int.TryParse(yearStr, out var year) && year > 2000 && year < 2100
-                            && int.TryParse(monthStr, out var month) && month >=1 && month <= 12)
-                        {
-                            var sum = GetExpensesSum(year, month);
-                            var text = sum.ToString();
-                            await botClient.SendTextMessageAsync(chatId, text, cancellationToken: cancellationToken);
-                        }
-                    }
+
+                    await botClient.SendTextMessageAsync(chatId, text,
+                        replyToMessageId: message.MessageId,
+                        cancellationToken: cancellationToken);
                 }
                 
                 return;
@@ -172,12 +154,6 @@ namespace ExpensesTelegramBot.Telegram
             }
 
             return stringBuilder.ToString();
-        }
-        
-        private decimal GetExpensesSum(int year, int month)
-        {
-            var expenses = _expensesRepository.GetAll(year, month);
-            return expenses.Sum(e => e.Money);
         }
     }
 }
