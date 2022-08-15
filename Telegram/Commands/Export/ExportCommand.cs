@@ -9,33 +9,28 @@ using ExpensesTelegramBot.Models;
 using ExpensesTelegramBot.Repositories;
 using Navoznov.DotNetHelpers.Extensions;
 
-namespace ExpensesTelegramBot.Telegram.Commands
+namespace ExpensesTelegramBot.Telegram.Commands.Export
 {
-    public class ExportCommandHandler 
+    public class ExportCommand : Command<ExportCommandInput, CommandFileResult>
     {
-        public const string EXPORT_COMMAND = "export";
+        public const string NAME = "export";
+
         private readonly IExpensesRepository _expensesRepository;
 
-        public ExportCommandHandler(IExpensesRepository expensesRepository)
+        public ExportCommand(ExportCommandInput input, IExpensesRepository expensesRepository) : base(input)
         {
             _expensesRepository = expensesRepository;
         }
 
-        public string Handle(string commandInput)
+        public override CommandFileResult Execute()
         {
-            if (!commandInput.StartsWith(EXPORT_COMMAND))
-            {
-                throw new ArgumentException($"Command should start with \"{EXPORT_COMMAND}\"");
-            }
-
-            var now = DateTime.Now;
-            var year = now.Year;
-            var month = now.Month;
+            var year = Input.Year;
+            var month = Input.Month;
             var expenses = _expensesRepository.GetAll(year, month);
-            var aggregatedExpenses = expenses.GroupBy(e=> e.Date)
-                .ToDictionary(g=>g.Key, g=> g.Sum(e=> e.Money));
+            var aggregatedExpenses = expenses.GroupBy(e => e.Date)
+                .ToDictionary(g => g.Key, g => g.Sum(e => e.Money));
 
-            var monthDaysCount = now.EndOfMonth().Day;
+            var monthDaysCount = new DateTime(year, month, 1).EndOfMonth().Day;
             var dayExpenses = Enumerable.Range(1, monthDaysCount)
                 .Select(day => new DateTime(year, month, day))
                 .Select(date => new Expense(aggregatedExpenses.GetValueOrDefault(date, 0), date, null))
@@ -51,7 +46,7 @@ namespace ExpensesTelegramBot.Telegram.Commands
             };
             using var csv = new CsvWriter(writer, csvConfiguration);
             csv.WriteRecords(dayExpenses);
-            return fileName;
+            return new CommandFileResult(fileName);
         }
     }
 }

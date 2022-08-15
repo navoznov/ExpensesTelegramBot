@@ -10,6 +10,7 @@ using ExpensesTelegramBot.Models;
 using ExpensesTelegramBot.Repositories;
 using ExpensesTelegramBot.Services;
 using ExpensesTelegramBot.Telegram.Commands;
+using ExpensesTelegramBot.Telegram.Commands.Export;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -65,16 +66,21 @@ namespace ExpensesTelegramBot.Telegram
                 {
                     await SendAllExpensesByCurrentMonth(botClient, chatId, cancellationToken);
                 }
-                else if (command.StartsWith("export"))
+                else if (command.StartsWith(ExportCommand.NAME))
                 {
-                    var exportCommandHandler = new ExportCommandHandler(_expensesRepository);
-                    var exportFileName = exportCommandHandler.Handle(command);
+                    var now = DateTime.Now;
+                    var exportCommandInput = new ExportCommandInput(now.Year, now.Month);
+                    var exportCommand = new ExportCommand(exportCommandInput, _expensesRepository);
+                    var exportResult = exportCommand.Execute();
+                    var exportFileName = exportResult.FilePath;
+
                     await using Stream stream = File.OpenRead(exportFileName);
                     var inputOnlineFile = new InputOnlineFile(stream, exportFileName);
                     await botClient.SendDocumentAsync(chatId, inputOnlineFile,
                         replyToMessageId: message.MessageId,
                         caption: "Expenses day by day for the month", 
                         cancellationToken: cancellationToken);
+                    
                     File.Delete(exportFileName);
                 }
                 else if (command.StartsWith("sum"))
@@ -119,7 +125,7 @@ namespace ExpensesTelegramBot.Telegram
             var answerText = "Parsing error";
             if (success)
             {
-                answerText = $"Parsed expense:\n{expense!.Date:yyyy MMM} => {expense.Money} {expense.Description}";
+                answerText = $"Parsed expense:\n{expense!.Date:yyyy MMM dd} => {expense.Money} {expense.Description}";
                 _expensesRepository.Save(expense);
             }
 

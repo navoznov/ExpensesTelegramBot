@@ -41,14 +41,15 @@ namespace ExpensesTelegramBot.Repositories
         public Expense[] GetAll(int year, int month)
         {
             var fileName = GetFileName(year, month);
-            if (!File.Exists(fileName))
+            var filePath = GetFilePath(fileName);
+            if (!File.Exists(filePath))
             {
                 return Array.Empty<Expense>();
             }
 
-            using var reader = new StreamReader(fileName);
+            using var reader = new StreamReader(filePath);
             using var csv = new CsvReader(reader, _csvConfiguration);
-            return GetExpensesFromFile(fileName)
+            return GetExpensesFromFile(filePath)
                 .OrderBy(e => e.Date)
                 .ToArray();
         }
