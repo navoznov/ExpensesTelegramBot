@@ -23,7 +23,7 @@ namespace ExpensesTelegramBot.Telegram
         public Bot(string token)
         {
             _botClient = new TelegramBotClient(token);
-            _updateHandler = new UpdateHandler(new CsvExpensesRepository(), new ExpenseParser());
+            _updateHandler = new UpdateHandler(new CsvExpensesRepository(), new ExpenseParser(), new ExpensePrinter());
             _expensesRepository = new CsvExpensesRepository();
         }
 
