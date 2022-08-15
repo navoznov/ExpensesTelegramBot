@@ -56,17 +56,18 @@ namespace ExpensesTelegramBot.Repositories
 
         public Expense[] GetLastExpenses(int count)
         {
-            var fileNames = new DirectoryInfo(".").GetFiles().Select(fi => fi.Name).ToArray();
-            
+            var dataDirectoryPath = Path.Combine(".", CSV_FILES_STORAGE_FOLDER_NAME);
+            var fileNames = new DirectoryInfo(dataDirectoryPath).GetFiles().Select(fi => fi.Name).ToArray();
+
             var regex = new Regex(@"^\d\d\d\d-\d\d\.csv$");
-            var test = regex.IsMatch("1233-34.csv");
             var matchedFileNames = fileNames.Where(fn => regex.IsMatch(fn))
                 .OrderByDescending(fn => fn)
                 .ToArray();
             var result = new List<Expense>();
             foreach (var fileName in matchedFileNames)
             {
-                var allFileRecords = GetExpensesFromFile(fileName);
+                var filePath = GetFilePath(fileName);
+                var allFileRecords = GetExpensesFromFile(filePath);
                 var expensesToResult = allFileRecords
                     .OrderByDescending(e => e.Date)
                     .Take(count - result.Count);
@@ -85,7 +86,7 @@ namespace ExpensesTelegramBot.Repositories
             var date = new DateTime(year, month, 1);
             return $"{date:yyyy-MM}.csv";
         }
-        
+
         private static string GetFilePath(string fileName)
         {
             return Path.Combine(CSV_FILES_STORAGE_FOLDER_NAME, fileName);
