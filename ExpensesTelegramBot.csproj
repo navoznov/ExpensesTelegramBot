@@ -6,7 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CsvHelper" Version="28.0.1" />
     <PackageReference Include="Navoznov.DotNetHelpers" Version="0.0.3" />
     <PackageReference Include="Telegram.Bot" Version="18.0.0" />
   </ItemGroup>
