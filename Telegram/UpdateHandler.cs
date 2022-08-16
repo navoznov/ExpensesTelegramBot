@@ -9,6 +9,7 @@ using ExpensesTelegramBot.Services;
 using ExpensesTelegramBot.Telegram.Commands;
 using ExpensesTelegramBot.Telegram.Commands.Export;
 using ExpensesTelegramBot.Telegram.Commands.Get;
+using ExpensesTelegramBot.Telegram.Commands.GetAll;
 using ExpensesTelegramBot.Telegram.Commands.Help;
 using ExpensesTelegramBot.Telegram.Commands.Sum;
 using Telegram.Bot;
@@ -72,11 +73,12 @@ namespace ExpensesTelegramBot.Telegram
                         replyToMessageId: message.MessageId,
                         cancellationToken: cancellationToken);
                 }
-                else if (command == "getall")
+                else if (command == GetAllCommand.NAME)
                 {
-                    var now = DateTime.Now;
-                    var expenses = _expensesRepository.GetAll(now.Year, now.Month);
-                    var text = _expensePrinter.ToPlainText(expenses);
+                    var getAllCommandInput = new GetAllCommandInput();
+                    var getAllCommand = new GetAllCommand(getAllCommandInput, _expensesRepository, _expensePrinter);
+                    var commandResult = getAllCommand.Execute();
+                    var text = commandResult.Text;
                     await botClient.SendTextMessageAsync(chatId, text, cancellationToken: cancellationToken);
                 }
                 else if (command.StartsWith(ExportCommand.NAME))
