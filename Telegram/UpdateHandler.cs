@@ -9,6 +9,7 @@ using ExpensesTelegramBot.Services;
 using ExpensesTelegramBot.Telegram.Commands;
 using ExpensesTelegramBot.Telegram.Commands.Export;
 using ExpensesTelegramBot.Telegram.Commands.Get;
+using ExpensesTelegramBot.Telegram.Commands.Help;
 using ExpensesTelegramBot.Telegram.Commands.Sum;
 using Telegram.Bot;
 using Telegram.Bot.Types;
@@ -52,12 +53,14 @@ namespace ExpensesTelegramBot.Telegram
             if (messageText.StartsWith("/"))
             {
                 var command = messageText[1..].ToLower();
-             
-                if (command == "help")
+                if (command == HelpCommand.NAME)
                 {
-                    var helpCommandOutput = await new HelpCommandHandler().Handle();
-                    var answer = await botClient.SendTextMessageAsync(chatId, helpCommandOutput, ParseMode.Markdown,
-                        replyToMessageId: message.MessageId, cancellationToken: cancellationToken);
+                    var helpCommand = new HelpCommand(new HelpCommandInput());
+                    var commandResult = helpCommand.Execute();
+                    var text = commandResult.Text;
+                    await botClient.SendTextMessageAsync(chatId, text, ParseMode.Markdown,
+                        replyToMessageId: message.MessageId, 
+                        cancellationToken: cancellationToken);
                 }
                 else if (command == GetCommand.NAME)
                 {
@@ -74,7 +77,7 @@ namespace ExpensesTelegramBot.Telegram
                     var now = DateTime.Now;
                     var expenses = _expensesRepository.GetAll(now.Year, now.Month);
                     var text = _expensePrinter.ToPlainText(expenses);
-                    await botClient.SendTextMessageAsync(chatId, text: text, cancellationToken: cancellationToken);
+                    await botClient.SendTextMessageAsync(chatId, text, cancellationToken: cancellationToken);
                 }
                 else if (command.StartsWith(ExportCommand.NAME))
                 {
