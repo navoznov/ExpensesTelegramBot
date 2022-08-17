@@ -2,15 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection.Metadata;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using ExpensesTelegramBot.Models;
 using ExpensesTelegramBot.Repositories;
 using ExpensesTelegramBot.Services;
-using ExpensesTelegramBot.Telegram.CommandHandlers;
 using Telegram.Bot;
+using ExpensesTelegramBot.Telegram.Commands.Export;
+using ExpensesTelegramBot.Telegram.Commands.Get;
+using ExpensesTelegramBot.Telegram.Commands.GetAll;
+using ExpensesTelegramBot.Telegram.Commands.Help;
+using ExpensesTelegramBot.Telegram.Commands.Sum;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.InputFiles;
@@ -53,66 +56,64 @@ namespace ExpensesTelegramBot.Telegram
             {
                 var command = messageText[1..].ToLower();
              
-                if (command == "help")
+                if (command == HelpCommand.NAME)
                 {
-                    var helpCommandOutput = await new HelpCommandHandler().Handle();
-                    var answer = await botClient.SendTextMessageAsync(chatId, helpCommandOutput, ParseMode.Markdown,
-                        replyToMessageId: message.MessageId, cancellationToken: cancellationToken);
+                    var helpCommand = new HelpCommand(new HelpCommandInput());
+                    var commandResult = helpCommand.Execute();
+                    var text = commandResult.Text;
+                    await botClient.SendTextMessageAsync(chatId, text, ParseMode.Markdown,
+                        replyToMessageId: message.MessageId, 
+                        cancellationToken: cancellationToken);
                 }
-                else if (command == "get")
+                else if (command == GetCommand.NAME)
                 {
-                    const int COUNT = 5;
-                    await SendLastExpenses(botClient, chatId, COUNT, cancellationToken);
+                    var getCommandInput = new GetCommandInput();
+                    var getCommand = new GetCommand(getCommandInput, _expensesRepository, _expensePrinter);
+                    var getCommandResult = getCommand.Execute();
+                    var text = getCommandResult.Text;
+                    await botClient.SendTextMessageAsync(chatId, text, 
+                        replyToMessageId: message.MessageId,
+                        cancellationToken: cancellationToken);
                 }
-                else if (command == "getall")
+                else if (command == GetAllCommand.NAME)
                 {
-                    await SendAllExpensesByCurrentMonth(botClient, chatId, cancellationToken);
+                    var getAllCommandInput = new GetAllCommandInput();
+                    var getAllCommand = new GetAllCommand(getAllCommandInput, _expensesRepository, _expensePrinter);
+                    var commandResult = getAllCommand.Execute();
+                    var text = commandResult.Text;
+                    await botClient.SendTextMessageAsync(chatId, text, cancellationToken: cancellationToken);
                 }
-                else if (command.StartsWith("export"))
+                else if (command.StartsWith(ExportCommand.NAME))
                 {
-                    var exportCommandHandler = new ExportCommandHandler(_expensesRepository, _expensePrinter);
-                    var exportFileName = exportCommandHandler.Handle(command);
+                    var now = DateTime.Now;
+                    var exportCommandInput = new ExportCommandInput(now.Year, now.Month);
+                    var exportCommand = new ExportCommand(exportCommandInput, _expensesRepository, _expensePrinter);
+                    var exportResult = exportCommand.Execute();
+                    var exportFileName = exportResult.FilePath;
+
                     await using Stream stream = File.OpenRead(exportFileName);
                     var inputOnlineFile = new InputOnlineFile(stream, exportFileName);
                     await botClient.SendDocumentAsync(chatId, inputOnlineFile,
                         replyToMessageId: message.MessageId,
                         caption: "Expenses day by day for the month", 
                         cancellationToken: cancellationToken);
+                    
                     File.Delete(exportFileName);
                 }
-                else if (command.StartsWith("sum"))
+                else if (command.StartsWith(SumCommandInput.NAME))
                 {
-                    var fields = command.Split(" ", StringSplitOptions.RemoveEmptyEntries);
-                    // /sum
-                    if (fields.Length == 1)         // /sum
+                    var argsStr = command[SumCommandInput.NAME.Length..];
+                    var text = "Command arguments parsing error";
+                    if(SumCommandInput.TryParse(argsStr, out var sumCommandInput))
                     {
-                        var now = DateTime.Now;
-                        var sum = GetExpensesSum(now.Year, now.Month);
-                        await botClient.SendTextMessageAsync(chatId, text: sum.ToString(), cancellationToken: cancellationToken);
+                        var sumCommand = new SumCommand(sumCommandInput!, _expensesRepository);
+                        var commandTextResult = sumCommand.Execute();
+                        text = commandTextResult.Text;
                     }
-                    
-                    if (fields.Length == 2)         // /sum 8
-                    {
-                        var monthStr = fields[1];
-                        if (int.TryParse(monthStr, out var month) && month >=1 && month <= 12)
-                        {
-                            var sum = GetExpensesSum(DateTime.Now.Year, month);
-                            var text = sum.ToString();
-                            await botClient.SendTextMessageAsync(chatId, text, cancellationToken: cancellationToken);
-                        }
-                    }
-                    else if (fields.Length == 3)    // /sum 2022 8
-                    {
-                        var yearStr = fields[1];
-                        var monthStr = fields[2];
-                        if (int.TryParse(yearStr, out var year) && year > 2000 && year < 2100
-                            && int.TryParse(monthStr, out var month) && month >=1 && month <= 12)
-                        {
-                            var sum = GetExpensesSum(year, month);
-                            var text = sum.ToString();
-                            await botClient.SendTextMessageAsync(chatId, text, cancellationToken: cancellationToken);
-                        }
-                    }
+
+                    await botClient.SendTextMessageAsync(chatId, text,
+                        replyToMessageId: message.MessageId,
+                        cancellationToken: cancellationToken);
                 }
                 
                 return;
@@ -128,52 +129,6 @@ namespace ExpensesTelegramBot.Telegram
 
             await botClient.SendTextMessageAsync(chatId: chatId, text: answerText,
                 replyToMessageId: message.MessageId, cancellationToken: cancellationToken);
-        }
-
-        private async Task SendAllExpensesByCurrentMonth(ITelegramBotClient botClient, long chatId,
-            CancellationToken cancellationToken)
-        {
-            var now = DateTime.Now;
-            var expenses = _expensesRepository.GetAll(now.Year, now.Month);
-            var text = GetExpensesText(expenses);
-
-            await botClient.SendTextMessageAsync(chatId, text: text, cancellationToken: cancellationToken);
-        }
-        
-        private async Task SendLastExpenses(ITelegramBotClient botClient, long chatId, int count,
-            CancellationToken cancellationToken)
-        {
-            var expenses = _expensesRepository.GetLastExpenses(count);
-            var text = GetExpensesText(expenses);
-
-            await botClient.SendTextMessageAsync(chatId, text: text, cancellationToken: cancellationToken);
-        }
-
-        private static string GetExpensesText(IReadOnlyCollection<Expense> expenses)
-        {
-            if (expenses.Count == 0)
-            {
-                return "No records";
-            }
-
-            var stringBuilder = new StringBuilder();
-            foreach (var expense in expenses)
-            {
-                stringBuilder.Append(expense.Date.ToString("yyyy-MM-dd"));
-                stringBuilder.Append('\t');
-                stringBuilder.Append(expense.Money);
-                stringBuilder.Append('\t');
-                stringBuilder.Append(expense.Description);
-                stringBuilder.AppendLine();
-            }
-
-            return stringBuilder.ToString();
-        }
-        
-        private decimal GetExpensesSum(int year, int month)
-        {
-            var expenses = _expensesRepository.GetAll(year, month);
-            return expenses.Sum(e => e.Money);
         }
     }
 }

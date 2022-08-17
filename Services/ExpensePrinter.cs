@@ -1,5 +1,5 @@
+using System.Text;
 using System.Globalization;
-using System.Threading.Tasks;
 using ExpensesTelegramBot.Models;
 
 namespace ExpensesTelegramBot.Services
@@ -8,6 +8,22 @@ namespace ExpensesTelegramBot.Services
     {
         private const string DATE_FORMAT = "yyyy-MM-dd";
         private const char CSV_DELIMITER = ';';
+
+        public string ToPlainText(Expense[] expenses)
+        {
+            var stringBuilder = new StringBuilder();
+            foreach (var expense in expenses)
+            {
+                stringBuilder.Append(expense.Date.ToString("yyyy-MM-dd"));
+                stringBuilder.Append('\t');
+                stringBuilder.Append(expense.Money);
+                stringBuilder.Append('\t');
+                stringBuilder.Append(expense.Description);
+                stringBuilder.AppendLine();
+            }
+
+            return stringBuilder.ToString();
+        }
 
         public string GetExpenseCsvString(Expense expense)
         {
@@ -19,11 +35,5 @@ namespace ExpensesTelegramBot.Services
             };
             return string.Join(CSV_DELIMITER, fields);
         }
-
-        // public string GetExpenseToMessageString(Expense expense)
-        // {
-        //     var dateStr = expense.Date.ToString(DATE_FORMAT);
-        //     return $"{dateStr} {expense.Money} {expense.Description}";
-        // }
     }
 }

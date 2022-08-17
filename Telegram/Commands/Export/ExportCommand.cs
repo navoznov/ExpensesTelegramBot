@@ -1,42 +1,35 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text;
 using ExpensesTelegramBot.Models;
 using ExpensesTelegramBot.Repositories;
 using ExpensesTelegramBot.Services;
 using Navoznov.DotNetHelpers.Extensions;
 
-namespace ExpensesTelegramBot.Telegram.CommandHandlers
+namespace ExpensesTelegramBot.Telegram.Commands.Export
 {
-    public class ExportCommandHandler 
+    public class ExportCommand : Command<ExportCommandInput, CommandFileResult>
     {
-        public const string EXPORT_COMMAND = "export";
+        public const string NAME = "export";
+
         private readonly IExpensesRepository _expensesRepository;
         private readonly IExpensePrinter _expensePrinter;
 
-        public ExportCommandHandler(IExpensesRepository expensesRepository, IExpensePrinter expensePrinter)
+        public ExportCommand(ExportCommandInput input, IExpensesRepository expensesRepository, IExpensePrinter expensePrinter) 
+            : base(input)
         {
             _expensesRepository = expensesRepository;
             _expensePrinter = expensePrinter;
         }
 
-        public string Handle(string commandInput)
+        public override CommandFileResult Execute()
         {
-            if (!commandInput.StartsWith(EXPORT_COMMAND))
-            {
-                throw new ArgumentException($"Command should start with \"{EXPORT_COMMAND}\"");
-            }
-
-            var now = DateTime.Now;
-            var year = now.Year;
-            var month = now.Month;
-
+            var year = Input.Year;
+            var month = Input.Month;
             var expenses = _expensesRepository.GetAll(year, month);
-            var aggregatedExpenses = expenses.GroupBy(e=> e.Date)
-                .ToDictionary(g=>g.Key, g=> g.Sum(e=> e.Money));
+            var aggregatedExpenses = expenses.GroupBy(e => e.Date)
+                .ToDictionary(g => g.Key, g => g.Sum(e => e.Money));
 
             var monthDaysCount = new DateTime(year, month, 1).EndOfMonth().Day;
             var dayExpenseStrings = Enumerable.Range(1, monthDaysCount)
@@ -53,7 +46,7 @@ namespace ExpensesTelegramBot.Telegram.CommandHandlers
                 writer.WriteLine(line);
             }
 
-            return fileName;
+            return new CommandFileResult(fileName);
         }
     }
 }
