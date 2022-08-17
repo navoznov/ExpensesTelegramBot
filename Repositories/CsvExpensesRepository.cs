@@ -13,12 +13,8 @@ namespace ExpensesTelegramBot.Repositories
     public class CsvExpensesRepository : IExpensesRepository
     {
         private const string CSV_FILES_STORAGE_FOLDER_NAME = "data";
-
-        private readonly CsvConfiguration _csvConfiguration = new CsvConfiguration(CultureInfo.InvariantCulture)
-        {
-            Delimiter = ";",
-            HasHeaderRecord = false,
-        };
+        private const string DATE_FORMAT = "yyyy-MM-dd";
+        private const char CSV_DELIMITER = ';';
 
         public CsvExpensesRepository()
         {
@@ -32,10 +28,10 @@ namespace ExpensesTelegramBot.Repositories
         {
             var fileName = GetFileName(expense.Date.Year, expense.Date.Month);
             var filePath = GetFilePath(fileName);
+            var expenseCsvString = GetExpenseCsvString(expense);
             using var stream = File.Open(filePath, FileMode.Append);
             using var writer = new StreamWriter(stream);
-            using var csv = new CsvWriter(writer, _csvConfiguration);
-            csv.WriteRecords(new[] {expense});
+            writer.WriteLine(expenseCsvString);
         }
 
         public Expense[] GetAll(int year, int month)
@@ -47,19 +43,20 @@ namespace ExpensesTelegramBot.Repositories
                 return Array.Empty<Expense>();
             }
 
-            using var reader = new StreamReader(filePath);
-            using var csv = new CsvReader(reader, _csvConfiguration);
-            return GetExpensesFromFile(filePath)
+            var expenses = GetExpensesFromFile(filePath);
+            return expenses
+                .Where(e => e.Date.Year == year && e.Date.Month == month)
                 .OrderBy(e => e.Date)
                 .ToArray();
         }
 
         public Expense[] GetLastExpenses(int count)
         {
-            var dataDirectoryPath = Path.Combine(".", CSV_FILES_STORAGE_FOLDER_NAME);
-            var fileNames = new DirectoryInfo(dataDirectoryPath).GetFiles().Select(fi => fi.Name).ToArray();
+            var directoryInfo = new DirectoryInfo(Path.Combine(".", CSV_FILES_STORAGE_FOLDER_NAME));
+            var fileNames = directoryInfo.GetFiles().Select(fi => fi.Name).ToArray();
 
-            var regex = new Regex(@"^\d\d\d\d-\d\d\.csv$");
+            const string EXPENSES_DATA_FILE_PATTERN = @"^\d\d\d\d-\d\d\.csv$";
+            var regex = new Regex(EXPENSES_DATA_FILE_PATTERN);
             var matchedFileNames = fileNames.Where(fn => regex.IsMatch(fn))
                 .OrderByDescending(fn => fn)
                 .ToArray();
@@ -94,9 +91,45 @@ namespace ExpensesTelegramBot.Repositories
 
         private Expense[] GetExpensesFromFile(string fileName)
         {
-            using var reader = new StreamReader(fileName);
-            using var csv = new CsvReader(reader, _csvConfiguration);
-            return csv.GetRecords<Expense>().ToArray();
+            var lines = File.ReadAllLines(fileName);
+            return lines.Select(ParseCsvExpense).ToArray();
+        }
+
+        Expense ParseCsvExpense(string line)
+        {
+            var fields = line.Split(CSV_DELIMITER);
+            if (fields.Length < 2)
+            {
+                throw new Exception("Parsing error. Line must have at least 2 fields");
+            }
+
+            var dateStr = fields[0];
+            if (!DateTime.TryParseExact(dateStr, DATE_FORMAT, CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var date))
+            {
+                throw new Exception($"Parsing error. Invalid date format {dateStr}");
+            }
+
+            var moneyStr = fields[1];
+            if (!decimal.TryParse(moneyStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var money))
+            {
+                throw new Exception($"Parsing error. Invalid money format {dateStr}");
+            }
+
+            var description = fields.Length > 2 ? fields[2] : null;
+
+            return new Expense(money, date, description);
+        }
+
+        string GetExpenseCsvString(Expense expense)
+        {
+            var fields = new[]
+            {
+                expense.Date.ToString(DATE_FORMAT),
+                expense.Money.ToString(CultureInfo.InvariantCulture),
+                expense.Description ?? string.Empty,
+            };
+            return string.Join(CSV_DELIMITER, fields);
         }
     }
 }

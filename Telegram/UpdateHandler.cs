@@ -1,18 +1,19 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection.Metadata;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using ExpensesTelegramBot.Models;
 using ExpensesTelegramBot.Repositories;
 using ExpensesTelegramBot.Services;
-using ExpensesTelegramBot.Telegram.Commands;
+using Telegram.Bot;
 using ExpensesTelegramBot.Telegram.Commands.Export;
 using ExpensesTelegramBot.Telegram.Commands.Get;
 using ExpensesTelegramBot.Telegram.Commands.GetAll;
 using ExpensesTelegramBot.Telegram.Commands.Help;
 using ExpensesTelegramBot.Telegram.Commands.Sum;
-using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.InputFiles;
@@ -54,6 +55,7 @@ namespace ExpensesTelegramBot.Telegram
             if (messageText.StartsWith("/"))
             {
                 var command = messageText[1..].ToLower();
+             
                 if (command == HelpCommand.NAME)
                 {
                     var helpCommand = new HelpCommand(new HelpCommandInput());
@@ -85,7 +87,7 @@ namespace ExpensesTelegramBot.Telegram
                 {
                     var now = DateTime.Now;
                     var exportCommandInput = new ExportCommandInput(now.Year, now.Month);
-                    var exportCommand = new ExportCommand(exportCommandInput, _expensesRepository);
+                    var exportCommand = new ExportCommand(exportCommandInput, _expensesRepository, _expensePrinter);
                     var exportResult = exportCommand.Execute();
                     var exportFileName = exportResult.FilePath;
 
@@ -121,7 +123,7 @@ namespace ExpensesTelegramBot.Telegram
             var answerText = "Parsing error";
             if (success)
             {
-                answerText = $"Parsed expense:\n{expense!.Date:yyyy MMM dd} => {expense.Money} {expense.Description}";
+                answerText = $"Parsed expense:\n{expense!.Date:yyyy MMM} => {expense.Money} {expense.Description}";
                 _expensesRepository.Save(expense);
             }
 

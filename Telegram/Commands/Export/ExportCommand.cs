@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using CsvHelper;
 using CsvHelper.Configuration;
 using ExpensesTelegramBot.Models;
 using ExpensesTelegramBot.Repositories;
+using ExpensesTelegramBot.Services;
 using Navoznov.DotNetHelpers.Extensions;
 
 namespace ExpensesTelegramBot.Telegram.Commands.Export
@@ -16,10 +18,13 @@ namespace ExpensesTelegramBot.Telegram.Commands.Export
         public const string NAME = "export";
 
         private readonly IExpensesRepository _expensesRepository;
+        private readonly IExpensePrinter _expensePrinter;
 
-        public ExportCommand(ExportCommandInput input, IExpensesRepository expensesRepository) : base(input)
+        public ExportCommand(ExportCommandInput input, IExpensesRepository expensesRepository, IExpensePrinter expensePrinter) 
+            : base(input)
         {
             _expensesRepository = expensesRepository;
+            _expensePrinter = expensePrinter;
         }
 
         public override CommandFileResult Execute()
@@ -31,21 +36,20 @@ namespace ExpensesTelegramBot.Telegram.Commands.Export
                 .ToDictionary(g => g.Key, g => g.Sum(e => e.Money));
 
             var monthDaysCount = new DateTime(year, month, 1).EndOfMonth().Day;
-            var dayExpenses = Enumerable.Range(1, monthDaysCount)
+            var dayExpenseStrings = Enumerable.Range(1, monthDaysCount)
                 .Select(day => new DateTime(year, month, day))
                 .Select(date => new Expense(aggregatedExpenses.GetValueOrDefault(date, 0), date, null))
+                .Select(e=>_expensePrinter.GetExpenseCsvString(e))
                 .ToArray();
 
-            var fileName = $"export-{year}-{month:00}.csv";
+            var fileName = $"export-{year}-{month:00}.csv"; 
             using var stream = File.Open(fileName, FileMode.Create);
             using var writer = new StreamWriter(stream);
-            var csvConfiguration = new CsvConfiguration(CultureInfo.InvariantCulture)
+            foreach (var line in dayExpenseStrings)
             {
-                Delimiter = ";",
-                HasHeaderRecord = false,
-            };
-            using var csv = new CsvWriter(writer, csvConfiguration);
-            csv.WriteRecords(dayExpenses);
+                writer.WriteLine(line);
+            }
+
             return new CommandFileResult(fileName);
         }
     }
