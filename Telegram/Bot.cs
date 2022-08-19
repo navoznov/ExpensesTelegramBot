@@ -12,13 +12,13 @@ namespace ExpensesTelegramBot.Telegram
 {
     public class Bot
     {
-        readonly TelegramBotClient _botClient;
+        private readonly TelegramBotClient _botClient;
         private readonly IUpdateHandler _updateHandler;
 
-        public Bot(string token)
+        public Bot(IUpdateHandler updateHandler, string token)
         {
             _botClient = new TelegramBotClient(token);
-            _updateHandler = new UpdateHandler(new CsvExpensesRepository(), new ExpenseParser(), new ExpensePrinter());
+            _updateHandler = updateHandler;
         }
 
         public async Task Run()
