@@ -72,7 +72,13 @@ namespace ExpensesTelegramBot.Repositories
 
         public Expense[] GetLastExpenses(long chatId, int count)
         {
-            var directoryInfo = new DirectoryInfo(Path.Combine(".", CSV_FILES_STORAGE_FOLDER_NAME));
+            var directoryPath = Path.Combine(".", CSV_FILES_STORAGE_FOLDER_NAME, chatId.ToString());
+            if (!Directory.Exists(directoryPath))
+            {
+                return Array.Empty<Expense>();
+            }
+            
+            var directoryInfo = new DirectoryInfo(directoryPath);
             var fileNames = directoryInfo.GetFiles().Select(fi => fi.Name).ToArray();
 
             const string EXPENSES_DATA_FILE_PATTERN = @"^\d\d\d\d-\d\d\.csv$";
@@ -106,7 +112,12 @@ namespace ExpensesTelegramBot.Repositories
 
         private static string GetFilePath(long chatId, string fileName)
         {
-            return Path.Combine(CSV_FILES_STORAGE_FOLDER_NAME, chatId.ToString(), fileName);
+            var directoryPath = Path.Combine(CSV_FILES_STORAGE_FOLDER_NAME, chatId.ToString());
+            if (!Directory.Exists(directoryPath))
+            {
+                Directory.CreateDirectory(directoryPath);
+            }
+            return Path.Combine(directoryPath, fileName);
         }
 
         private static void AppendToFile(string filePath, string text)
