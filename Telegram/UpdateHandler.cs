@@ -122,8 +122,8 @@ namespace ExpensesTelegramBot.Telegram
 
             var expensesParsingResult = await _expenseParser.TryParse(messageText);
             _expensesRepository.Save(expensesParsingResult.ParsedExpenses);
-            var answerText = GetExpensesParsingAnswerText(expensesParsingResult);
-            await botClient.SendTextMessageAsync(chatId: chatId, text: answerText,
+            var expensesParsingAnswerText = GetExpensesParsingAnswerText(expensesParsingResult);
+            await botClient.SendTextMessageAsync(chatId: chatId, text: expensesParsingAnswerText,
                 replyToMessageId: message.MessageId, cancellationToken: cancellationToken);
         }
 
@@ -135,23 +135,40 @@ namespace ExpensesTelegramBot.Telegram
                 .AppendLine($"Parsed count: {parsedExpenses.Length}")
                 .AppendLine($"Unparsed count: {unparsedLines.Length}");
 
-            var expensesText = _expensePrinter.ToPlainText(parsedExpenses);
-            var expensesAnswerText = string.IsNullOrEmpty(expensesText) ? "No expenses" : expensesText;
-            answerTextBuilder
-                .AppendLine()
-                .AppendLine("Parsed expenses:")
-                .AppendLine(expensesAnswerText);
-
-            if (unparsedLines.Any())
-            {
-                answerTextBuilder.AppendLine("Unparsed lines:");
-                foreach (var unparsedLine in unparsedLines)
-                {
-                    answerTextBuilder.AppendLine(unparsedLine);
-                }
-            }
+            AppendParsedExpensesBlock(answerTextBuilder, parsedExpenses);
+            AppendUnparsedLinesBlock(answerTextBuilder, unparsedLines);
 
             return answerTextBuilder.ToString();
+        }
+
+        private void AppendParsedExpensesBlock(StringBuilder answerTextBuilder, Expense[] parsedExpenses)
+        {
+            answerTextBuilder
+                .AppendLine()
+                .AppendLine("Parsed expenses:");
+
+            if (parsedExpenses.Any())
+            {
+                var expensesText = _expensePrinter.ToPlainText(parsedExpenses);
+                answerTextBuilder.Append(expensesText);
+            }
+            else
+            {
+                answerTextBuilder.AppendLine("No expenses");
+            }
+        }
+
+        private void AppendUnparsedLinesBlock(StringBuilder? answerTextBuilder, string[] unparsedLines)
+        {
+            if (unparsedLines.Length == 0) return;
+
+            answerTextBuilder
+                .AppendLine()
+                .AppendLine("Unparsed lines:");
+            foreach (var unparsedLine in unparsedLines)
+            {
+                answerTextBuilder.AppendLine(unparsedLine);
+            }
         }
     }
 }
