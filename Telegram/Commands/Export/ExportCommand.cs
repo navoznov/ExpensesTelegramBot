@@ -15,10 +15,13 @@ namespace ExpensesTelegramBot.Telegram.Commands.Export
 
         private readonly IExpensesRepository _expensesRepository;
         private readonly IExpensePrinter _expensePrinter;
+        private readonly long _chatId;
 
-        public ExportCommand(ExportCommandInput input, IExpensesRepository expensesRepository, IExpensePrinter expensePrinter) 
+        public ExportCommand(ExportCommandInput input, long chatId, IExpensesRepository expensesRepository,
+            IExpensePrinter expensePrinter) 
             : base(input)
         {
+            _chatId = chatId;
             _expensesRepository = expensesRepository;
             _expensePrinter = expensePrinter;
         }
@@ -27,7 +30,7 @@ namespace ExpensesTelegramBot.Telegram.Commands.Export
         {
             var year = Input.Year;
             var month = Input.Month;
-            var expenses = _expensesRepository.GetAll(year, month);
+            var expenses = _expensesRepository.GetAll(_chatId, year, month);
             var aggregatedExpenses = expenses.GroupBy(e => e.Date)
                 .ToDictionary(g => g.Key, g => g.Sum(e => e.Money));
 

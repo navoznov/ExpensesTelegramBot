@@ -11,10 +11,13 @@ namespace ExpensesTelegramBot.Telegram.Commands.Get
 
         private readonly IExpensesRepository _expensesRepository;
         private readonly IExpensePrinter _expensePrinter;
+        private long _chatId;
 
-        public GetCommand(GetCommandInput input, IExpensesRepository expensesRepository, IExpensePrinter expensePrinter)
+        public GetCommand(GetCommandInput input,
+            long chatId, IExpensesRepository expensesRepository, IExpensePrinter expensePrinter)
             : base(input)
         {
+            _chatId = chatId;
             _expensesRepository = expensesRepository;
             _expensePrinter = expensePrinter;
         }
@@ -23,7 +26,7 @@ namespace ExpensesTelegramBot.Telegram.Commands.Get
         {
             const int COUNT = 5;
             var now = DateTime.Now;
-            var expenses = _expensesRepository.GetLastExpenses(COUNT);
+            var expenses = _expensesRepository.GetLastExpenses(_chatId, COUNT);
             var text = expenses.Any()? _expensePrinter.ToPlainText(expenses) : "No records";
             return new CommandTextResult(text);
         }

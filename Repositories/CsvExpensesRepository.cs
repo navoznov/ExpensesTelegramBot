@@ -27,7 +27,7 @@ namespace ExpensesTelegramBot.Repositories
             }
         }
 
-        public void Save(Expense[] expenses)
+        public void Save(long chatId, Expense[] expenses)
         {
             var expensesGroupedByFileName = expenses
                 .GroupBy(e => GetFileName(e.Date.Year, e.Date.Month));
@@ -36,7 +36,7 @@ namespace ExpensesTelegramBot.Repositories
             {
 
                 var fileName = expensesGroup!.Key;
-                var filePath = GetFilePath(fileName);
+                var filePath = GetFilePath(chatId, fileName);
                 var csv = GetExpensesCsv(expensesGroup);
                 AppendToFile(filePath, csv);
             }
@@ -54,10 +54,10 @@ namespace ExpensesTelegramBot.Repositories
             return csvTextBuilder.ToString();
         }
 
-        public Expense[] GetAll(int year, int month)
+        public Expense[] GetAll(long chatId, int year, int month)
         {
             var fileName = GetFileName(year, month);
-            var filePath = GetFilePath(fileName);
+            var filePath = GetFilePath(chatId, fileName);
             if (!File.Exists(filePath))
             {
                 return Array.Empty<Expense>();
@@ -70,7 +70,7 @@ namespace ExpensesTelegramBot.Repositories
                 .ToArray();
         }
 
-        public Expense[] GetLastExpenses(int count)
+        public Expense[] GetLastExpenses(long chatId, int count)
         {
             var directoryInfo = new DirectoryInfo(Path.Combine(".", CSV_FILES_STORAGE_FOLDER_NAME));
             var fileNames = directoryInfo.GetFiles().Select(fi => fi.Name).ToArray();
@@ -83,7 +83,7 @@ namespace ExpensesTelegramBot.Repositories
             var result = new List<Expense>();
             foreach (var fileName in matchedFileNames)
             {
-                var filePath = GetFilePath(fileName);
+                var filePath = GetFilePath(chatId, fileName);
                 var allFileRecords = GetExpensesFromFile(filePath);
                 var expensesToResult = allFileRecords
                     .OrderByDescending(e => e.Date)
@@ -104,9 +104,9 @@ namespace ExpensesTelegramBot.Repositories
             return $"{date:yyyy-MM}.csv";
         }
 
-        private static string GetFilePath(string fileName)
+        private static string GetFilePath(long chatId, string fileName)
         {
-            return Path.Combine(CSV_FILES_STORAGE_FOLDER_NAME, fileName);
+            return Path.Combine(CSV_FILES_STORAGE_FOLDER_NAME, chatId.ToString(), fileName);
         }
 
         private static void AppendToFile(string filePath, string text)
