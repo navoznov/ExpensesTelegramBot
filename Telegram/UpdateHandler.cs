@@ -69,7 +69,7 @@ namespace ExpensesTelegramBot.Telegram
                 else if (command == GetCommand.NAME)
                 {
                     var getCommandInput = new GetCommandInput();
-                    var getCommand = new GetCommand(getCommandInput, _expensesRepository, _expensePrinter);
+                    var getCommand = new GetCommand(getCommandInput, chatId, _expensesRepository, _expensePrinter);
                     var getCommandResult = getCommand.Execute();
                     var text = getCommandResult.Text;
                     await botClient.SendTextMessageAsync(chatId, text,
@@ -79,7 +79,7 @@ namespace ExpensesTelegramBot.Telegram
                 else if (command == GetAllCommand.NAME)
                 {
                     var getAllCommandInput = new GetAllCommandInput();
-                    var getAllCommand = new GetAllCommand(getAllCommandInput, _expensesRepository, _expensePrinter);
+                    var getAllCommand = new GetAllCommand(getAllCommandInput, chatId, _expensesRepository, _expensePrinter);
                     var commandResult = getAllCommand.Execute();
                     var text = commandResult.Text;
                     await botClient.SendTextMessageAsync(chatId, text, cancellationToken: cancellationToken);
@@ -88,7 +88,7 @@ namespace ExpensesTelegramBot.Telegram
                 {
                     var now = DateTime.Now;
                     var exportCommandInput = new ExportCommandInput(now.Year, now.Month);
-                    var exportCommand = new ExportCommand(exportCommandInput, _expensesRepository, _expensePrinter);
+                    var exportCommand = new ExportCommand(exportCommandInput, chatId, _expensesRepository, _expensePrinter);
                     var exportResult = exportCommand.Execute();
                     var exportFileName = exportResult.FilePath;
 
@@ -107,7 +107,7 @@ namespace ExpensesTelegramBot.Telegram
                     var argsStr = command[SumCommandInput.NAME.Length..];
                     if (SumCommandInput.TryParse(argsStr, out var sumCommandInput))
                     {
-                        var sumCommand = new SumCommand(sumCommandInput!, _expensesRepository);
+                        var sumCommand = new SumCommand(sumCommandInput!, chatId, _expensesRepository);
                         var commandTextResult = sumCommand.Execute();
                         text = commandTextResult.Text;
                     }
@@ -121,7 +121,7 @@ namespace ExpensesTelegramBot.Telegram
             }
 
             var expensesParsingResult = await _expenseParser.TryParse(messageText);
-            _expensesRepository.Save(expensesParsingResult.ParsedExpenses);
+            _expensesRepository.Save(chatId, expensesParsingResult.ParsedExpenses);
             var expensesParsingAnswerText = GetExpensesParsingAnswerText(expensesParsingResult);
             await botClient.SendTextMessageAsync(chatId: chatId, text: expensesParsingAnswerText,
                 replyToMessageId: message.MessageId, cancellationToken: cancellationToken);
@@ -158,7 +158,7 @@ namespace ExpensesTelegramBot.Telegram
             }
         }
 
-        private void AppendUnparsedLinesBlock(StringBuilder? answerTextBuilder, string[] unparsedLines)
+        private void AppendUnparsedLinesBlock(StringBuilder answerTextBuilder, string[] unparsedLines)
         {
             if (unparsedLines.Length == 0) return;
 
