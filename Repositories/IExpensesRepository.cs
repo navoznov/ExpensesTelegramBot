@@ -6,7 +6,7 @@ namespace ExpensesTelegramBot.Repositories
 {
     public interface IExpensesRepository
     {
-        void Save(Expense expense);
+        void Save(Expense[] expenses);
         Expense[] GetAll(int year, int month);
         Expense[] GetLastExpenses(int count);
     }

@@ -3,33 +3,55 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using ExpensesTelegramBot.Models;
+using ExpensesTelegramBot.Services;
 
 namespace ExpensesTelegramBot.Repositories
 {
     public class CsvExpensesRepository : IExpensesRepository
     {
+        private readonly IExpensePrinter _expensePrinter;
         private const string CSV_FILES_STORAGE_FOLDER_NAME = "data";
         private const string DATE_FORMAT = "yyyy-MM-dd";
         private const char CSV_DELIMITER = ';';
 
-        public CsvExpensesRepository()
+        public CsvExpensesRepository(IExpensePrinter expensePrinter)
         {
+            _expensePrinter = expensePrinter;
             if (!Directory.Exists(CSV_FILES_STORAGE_FOLDER_NAME))
             {
                 Directory.CreateDirectory(CSV_FILES_STORAGE_FOLDER_NAME);
             }
         }
 
-        public void Save(Expense expense)
+        public void Save(Expense[] expenses)
         {
-            var fileName = GetFileName(expense.Date.Year, expense.Date.Month);
-            var filePath = GetFilePath(fileName);
-            var expenseCsvString = GetExpenseCsvString(expense);
-            using var stream = File.Open(filePath, FileMode.Append);
-            using var writer = new StreamWriter(stream);
-            writer.WriteLine(expenseCsvString);
+            var expensesGroupedByFileName = expenses
+                .GroupBy(e => GetFileName(e.Date.Year, e.Date.Month));
+
+            foreach (var expensesGroup in expensesGroupedByFileName)
+            {
+
+                var fileName = expensesGroup!.Key;
+                var filePath = GetFilePath(fileName);
+                var csv = GetExpensesCsv(expensesGroup);
+                AppendToFile(filePath, csv);
+            }
+        }
+
+        private string GetExpensesCsv(IEnumerable<Expense> expenses)
+        {
+            var csvTextBuilder = new StringBuilder();
+            foreach (var expense in expenses)
+            {
+                var expenseCsvString = _expensePrinter.GetExpenseCsvString(expense);
+                csvTextBuilder.AppendLine(expenseCsvString);
+            }
+
+            return csvTextBuilder.ToString();
         }
 
         public Expense[] GetAll(int year, int month)
@@ -87,6 +109,13 @@ namespace ExpensesTelegramBot.Repositories
             return Path.Combine(CSV_FILES_STORAGE_FOLDER_NAME, fileName);
         }
 
+        private static void AppendToFile(string filePath, string text)
+        {
+            using var stream = File.Open(filePath, FileMode.Append);
+            using var writer = new StreamWriter(stream);
+            writer.WriteAsync(text);
+        }
+
         private Expense[] GetExpensesFromFile(string fileName)
         {
             var lines = File.ReadAllLines(fileName);
@@ -117,17 +146,6 @@ namespace ExpensesTelegramBot.Repositories
             var description = fields.Length > 2 ? fields[2] : null;
 
             return new Expense(money, date, description);
-        }
-
-        string GetExpenseCsvString(Expense expense)
-        {
-            var fields = new[]
-            {
-                expense.Date.ToString(DATE_FORMAT),
-                expense.Money.ToString(CultureInfo.InvariantCulture),
-                expense.Description ?? string.Empty,
-            };
-            return string.Join(CSV_DELIMITER, fields);
         }
     }
 }

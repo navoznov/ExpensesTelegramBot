@@ -1,7 +1,10 @@
 using System;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using ExpensesTelegramBot.Models;
 using ExpensesTelegramBot.Repositories;
 using ExpensesTelegramBot.Services;
 using Telegram.Bot;
@@ -31,7 +34,8 @@ namespace ExpensesTelegramBot.Telegram
             _expensePrinter = expensePrinter;
         }
 
-        public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update,
+            CancellationToken cancellationToken)
         {
             // Only process Message updates: https://core.telegram.org/bots/api#message
             var message = update.Message;
@@ -47,18 +51,19 @@ namespace ExpensesTelegramBot.Telegram
                 return;
             }
 
+            Console.WriteLine($"Received a message: {messageText}");
             var chatId = message.Chat.Id;
             if (messageText.StartsWith("/"))
             {
                 var command = messageText[1..].ToLower();
-             
+
                 if (command == HelpCommand.NAME)
                 {
                     var helpCommand = new HelpCommand(new HelpCommandInput());
                     var commandResult = helpCommand.Execute();
                     var text = commandResult.Text;
                     await botClient.SendTextMessageAsync(chatId, text, ParseMode.Markdown,
-                        replyToMessageId: message.MessageId, 
+                        replyToMessageId: message.MessageId,
                         cancellationToken: cancellationToken);
                 }
                 else if (command == GetCommand.NAME)
@@ -67,7 +72,7 @@ namespace ExpensesTelegramBot.Telegram
                     var getCommand = new GetCommand(getCommandInput, _expensesRepository, _expensePrinter);
                     var getCommandResult = getCommand.Execute();
                     var text = getCommandResult.Text;
-                    await botClient.SendTextMessageAsync(chatId, text, 
+                    await botClient.SendTextMessageAsync(chatId, text,
                         replyToMessageId: message.MessageId,
                         cancellationToken: cancellationToken);
                 }
@@ -91,16 +96,16 @@ namespace ExpensesTelegramBot.Telegram
                     var inputOnlineFile = new InputOnlineFile(stream, exportFileName);
                     await botClient.SendDocumentAsync(chatId, inputOnlineFile,
                         replyToMessageId: message.MessageId,
-                        caption: "Expenses day by day for the month", 
+                        caption: "Expenses day by day for the month",
                         cancellationToken: cancellationToken);
-                    
+
                     File.Delete(exportFileName);
                 }
                 else if (command.StartsWith(SumCommandInput.NAME))
                 {
-                    var argsStr = command[SumCommandInput.NAME.Length..];
                     var text = "Command arguments parsing error";
-                    if(SumCommandInput.TryParse(argsStr, out var sumCommandInput))
+                    var argsStr = command[SumCommandInput.NAME.Length..];
+                    if (SumCommandInput.TryParse(argsStr, out var sumCommandInput))
                     {
                         var sumCommand = new SumCommand(sumCommandInput!, _expensesRepository);
                         var commandTextResult = sumCommand.Execute();
@@ -111,20 +116,59 @@ namespace ExpensesTelegramBot.Telegram
                         replyToMessageId: message.MessageId,
                         cancellationToken: cancellationToken);
                 }
-                
+
                 return;
             }
 
-            var (success, expense) = _expenseParser.TryParse(messageText);
-            var answerText = "Parsing error";
-            if (success)
-            {
-                answerText = $"Parsed expense:\n{expense!.Date:yyyy MMM} => {expense.Money} {expense.Description}";
-                _expensesRepository.Save(expense);
-            }
-
-            await botClient.SendTextMessageAsync(chatId: chatId, text: answerText,
+            var expensesParsingResult = await _expenseParser.TryParse(messageText);
+            _expensesRepository.Save(expensesParsingResult.ParsedExpenses);
+            var expensesParsingAnswerText = GetExpensesParsingAnswerText(expensesParsingResult);
+            await botClient.SendTextMessageAsync(chatId: chatId, text: expensesParsingAnswerText,
                 replyToMessageId: message.MessageId, cancellationToken: cancellationToken);
+        }
+
+        private string? GetExpensesParsingAnswerText(ExpensesParsingResult expensesParsingResult)
+        {
+            var parsedExpenses = expensesParsingResult.ParsedExpenses;
+            var unparsedLines = expensesParsingResult.UnparsedLines;
+            var answerTextBuilder = new StringBuilder()
+                .AppendLine($"Parsed count: {parsedExpenses.Length}")
+                .AppendLine($"Unparsed count: {unparsedLines.Length}");
+
+            AppendParsedExpensesBlock(answerTextBuilder, parsedExpenses);
+            AppendUnparsedLinesBlock(answerTextBuilder, unparsedLines);
+
+            return answerTextBuilder.ToString();
+        }
+
+        private void AppendParsedExpensesBlock(StringBuilder answerTextBuilder, Expense[] parsedExpenses)
+        {
+            answerTextBuilder
+                .AppendLine()
+                .AppendLine("Parsed expenses:");
+
+            if (parsedExpenses.Any())
+            {
+                var expensesText = _expensePrinter.ToPlainText(parsedExpenses);
+                answerTextBuilder.Append(expensesText);
+            }
+            else
+            {
+                answerTextBuilder.AppendLine("No expenses");
+            }
+        }
+
+        private void AppendUnparsedLinesBlock(StringBuilder? answerTextBuilder, string[] unparsedLines)
+        {
+            if (unparsedLines.Length == 0) return;
+
+            answerTextBuilder
+                .AppendLine()
+                .AppendLine("Unparsed lines:");
+            foreach (var unparsedLine in unparsedLines)
+            {
+                answerTextBuilder.AppendLine(unparsedLine);
+            }
         }
     }
 }
