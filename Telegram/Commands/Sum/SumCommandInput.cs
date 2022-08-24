@@ -4,8 +4,6 @@ namespace ExpensesTelegramBot.Telegram.Commands.Sum
 {
     public class SumCommandInput : CommandInput
     {
-        public const string NAME = "sum";
-
         public int Year { get; }
         public int Month { get; }
 

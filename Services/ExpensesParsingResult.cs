@@ -8,9 +8,7 @@ namespace ExpensesTelegramBot.Services
         public Expense[] ParsedExpenses { get; set; }
         public string[] UnparsedLines { get; set; }
 
-        public ExpensesParsingResult(bool isSuccess,
-            Expense[] parsedExpenses = null,
-            string[] unparsedLines = null)
+        public ExpensesParsingResult(bool isSuccess, Expense[] parsedExpenses = null, string[] unparsedLines = null)
         {
             IsSuccess = isSuccess;
             ParsedExpenses = parsedExpenses;
