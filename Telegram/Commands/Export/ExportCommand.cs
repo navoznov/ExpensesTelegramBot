@@ -9,16 +9,14 @@ using Navoznov.DotNetHelpers.Extensions;
 
 namespace ExpensesTelegramBot.Telegram.Commands.Export
 {
-    public class ExportCommand : Command<ExportCommandInput, CommandFileResult>
+    public class ExportCommand : Command
     {
-        public const string NAME = "export";
-
         private readonly IExpensesRepository _expensesRepository;
         private readonly IExpensePrinter _expensePrinter;
         private readonly long _chatId;
 
         public ExportCommand(ExportCommandInput input, long chatId, IExpensesRepository expensesRepository,
-            IExpensePrinter expensePrinter) 
+            IExpensePrinter expensePrinter)
             : base(input)
         {
             _chatId = chatId;
@@ -26,10 +24,11 @@ namespace ExpensesTelegramBot.Telegram.Commands.Export
             _expensePrinter = expensePrinter;
         }
 
-        public override CommandFileResult Execute()
+        public override CommandResult Execute()
         {
-            var year = Input.Year;
-            var month = Input.Month;
+            var input = (ExportCommandInput) Input;
+            var year = input.Year;
+            var month = input.Month;
             var expenses = _expensesRepository.GetAll(_chatId, year, month);
             var aggregatedExpenses = expenses.GroupBy(e => e.Date)
                 .ToDictionary(g => g.Key, g => g.Sum(e => e.Money));
@@ -38,10 +37,10 @@ namespace ExpensesTelegramBot.Telegram.Commands.Export
             var dayExpenseStrings = Enumerable.Range(1, monthDaysCount)
                 .Select(day => new DateTime(year, month, day))
                 .Select(date => new Expense(aggregatedExpenses.GetValueOrDefault(date, 0), date, null))
-                .Select(e=>_expensePrinter.GetExpenseCsvString(e))
+                .Select(e => _expensePrinter.GetExpenseCsvString(e))
                 .ToArray();
 
-            var fileName = $"export-{year}-{month:00}.csv"; 
+            var fileName = $"export-{year}-{month:00}.csv";
             using var stream = File.Open(fileName, FileMode.Create);
             using var writer = new StreamWriter(stream);
             foreach (var line in dayExpenseStrings)

@@ -4,13 +4,11 @@ using ExpensesTelegramBot.Services;
 
 namespace ExpensesTelegramBot.Telegram.Commands.GetAll
 {
-    public class GetAllCommand : Command<GetAllCommandInput, CommandTextResult>
+    public class GetAllCommand : Command
     {
-        public const string NAME = "getall";
-
         private readonly IExpensesRepository _expensesRepository;
         private readonly IExpensePrinter _expensePrinter;
-        private long _chatId;
+        private readonly long _chatId;
 
         public GetAllCommand(GetAllCommandInput input, long chatId, IExpensesRepository expensesRepository,
             IExpensePrinter expensePrinter)
@@ -21,9 +19,10 @@ namespace ExpensesTelegramBot.Telegram.Commands.GetAll
             _expensePrinter = expensePrinter;
         }
 
-        public override CommandTextResult Execute()
+        public override CommandResult Execute()
         {
-            var expenses = _expensesRepository.GetAll(_chatId, Input.Year, Input.Month);
+            var input = (GetAllCommandInput) Input;
+            var expenses = _expensesRepository.GetAll(_chatId, input.Year, input.Month);
             var text = _expensePrinter.ToPlainText(expenses);
             return new CommandTextResult(text);
         }

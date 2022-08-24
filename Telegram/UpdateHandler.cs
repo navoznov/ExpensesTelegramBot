@@ -4,9 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using ExpensesTelegramBot.Exceptions;
 using ExpensesTelegramBot.Models;
 using ExpensesTelegramBot.Repositories;
 using ExpensesTelegramBot.Services;
+using ExpensesTelegramBot.Telegram.Commands;
 using Telegram.Bot;
 using ExpensesTelegramBot.Telegram.Commands.Export;
 using ExpensesTelegramBot.Telegram.Commands.Get;
@@ -25,13 +27,15 @@ namespace ExpensesTelegramBot.Telegram
         private readonly IExpensesRepository _expensesRepository;
         private readonly IExpenseParser _expenseParser;
         private readonly IExpensePrinter _expensePrinter;
+        private readonly ICommandCreator _commandCreator;
 
         public UpdateHandler(IExpensesRepository expensesRepository, IExpenseParser expenseParser,
-            IExpensePrinter expensePrinter)
+            IExpensePrinter expensePrinter, ICommandCreator commandCreator)
         {
             _expensesRepository = expensesRepository;
             _expenseParser = expenseParser;
             _expensePrinter = expensePrinter;
+            _commandCreator = commandCreator;
         }
 
         public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update,
@@ -53,68 +57,20 @@ namespace ExpensesTelegramBot.Telegram
 
             Console.WriteLine($"Received a message: {messageText}");
             var chatId = message.Chat.Id;
+            var replyToMessageId = message.MessageId;
             if (messageText.StartsWith("/"))
             {
-                var command = messageText[1..].ToLower();
-
-                if (command == HelpCommand.NAME)
+                try
                 {
-                    var helpCommand = new HelpCommand(new HelpCommandInput());
-                    var commandResult = helpCommand.Execute();
-                    var text = commandResult.Text;
-                    await botClient.SendTextMessageAsync(chatId, text, ParseMode.Markdown,
-                        replyToMessageId: message.MessageId,
-                        cancellationToken: cancellationToken);
+                    var command = _commandCreator.CreateCommand(messageText, chatId);
+                    var commandResult = command.Execute();
+                    await ProcessCommandResult(commandResult, botClient, chatId, replyToMessageId, cancellationToken);
                 }
-                else if (command == GetCommand.NAME)
+                catch (ParsingException e)
                 {
-                    var getCommandInput = new GetCommandInput();
-                    var getCommand = new GetCommand(getCommandInput, chatId, _expensesRepository, _expensePrinter);
-                    var getCommandResult = getCommand.Execute();
-                    var text = getCommandResult.Text;
-                    await botClient.SendTextMessageAsync(chatId, text,
-                        replyToMessageId: message.MessageId,
-                        cancellationToken: cancellationToken);
-                }
-                else if (command == GetAllCommand.NAME)
-                {
-                    var getAllCommandInput = new GetAllCommandInput();
-                    var getAllCommand = new GetAllCommand(getAllCommandInput, chatId, _expensesRepository, _expensePrinter);
-                    var commandResult = getAllCommand.Execute();
-                    var text = commandResult.Text;
-                    await botClient.SendTextMessageAsync(chatId, text, cancellationToken: cancellationToken);
-                }
-                else if (command.StartsWith(ExportCommand.NAME))
-                {
-                    var now = DateTime.Now;
-                    var exportCommandInput = new ExportCommandInput(now.Year, now.Month);
-                    var exportCommand = new ExportCommand(exportCommandInput, chatId, _expensesRepository, _expensePrinter);
-                    var exportResult = exportCommand.Execute();
-                    var exportFileName = exportResult.FilePath;
-
-                    await using Stream stream = File.OpenRead(exportFileName);
-                    var inputOnlineFile = new InputOnlineFile(stream, exportFileName);
-                    await botClient.SendDocumentAsync(chatId, inputOnlineFile,
-                        replyToMessageId: message.MessageId,
-                        caption: "Expenses day by day for the month",
-                        cancellationToken: cancellationToken);
-
-                    File.Delete(exportFileName);
-                }
-                else if (command.StartsWith(SumCommandInput.NAME))
-                {
-                    var text = "Command arguments parsing error";
-                    var argsStr = command[SumCommandInput.NAME.Length..];
-                    if (SumCommandInput.TryParse(argsStr, out var sumCommandInput))
-                    {
-                        var sumCommand = new SumCommand(sumCommandInput!, chatId, _expensesRepository);
-                        var commandTextResult = sumCommand.Execute();
-                        text = commandTextResult.Text;
-                    }
-
-                    await botClient.SendTextMessageAsync(chatId, text,
-                        replyToMessageId: message.MessageId,
-                        cancellationToken: cancellationToken);
+                    Console.WriteLine(e);
+                    await botClient.SendTextMessageAsync(chatId: chatId, text: "Unknown command",
+                        replyToMessageId: replyToMessageId, cancellationToken: cancellationToken);
                 }
 
                 return;
@@ -124,10 +80,44 @@ namespace ExpensesTelegramBot.Telegram
             _expensesRepository.Save(chatId, expensesParsingResult.ParsedExpenses);
             var expensesParsingAnswerText = GetExpensesParsingAnswerText(expensesParsingResult);
             await botClient.SendTextMessageAsync(chatId: chatId, text: expensesParsingAnswerText,
-                replyToMessageId: message.MessageId, cancellationToken: cancellationToken);
+                replyToMessageId: replyToMessageId, cancellationToken: cancellationToken);
         }
 
-        private string? GetExpensesParsingAnswerText(ExpensesParsingResult expensesParsingResult)
+        private static async Task ProcessCommandResult(CommandResult commandResult, ITelegramBotClient botClient, 
+            long chatId, int replyToMessageId, CancellationToken cancellationToken)
+        {
+            switch (commandResult)
+            {
+                case CommandTextResult commandTextResult:
+                    await botClient.SendTextMessageAsync(chatId: chatId, text: commandTextResult.Text,
+                        replyToMessageId: replyToMessageId, cancellationToken: cancellationToken);
+                    break;
+                case CommandMarkdownTextResult commandMarkdownTextResult:
+                    await botClient.SendTextMessageAsync(chatId,
+                        commandMarkdownTextResult.MarkdownText,
+                        ParseMode.Markdown,
+                        replyToMessageId: replyToMessageId,
+                        cancellationToken: cancellationToken);
+                    break;
+                case CommandFileResult commandFileResult:
+                {
+                    var exportFileName = commandFileResult.FilePath;
+                    await using Stream stream = File.OpenRead(exportFileName);
+                    var inputOnlineFile = new InputOnlineFile(stream, exportFileName);
+                    await botClient.SendDocumentAsync(chatId, inputOnlineFile,
+                        replyToMessageId: replyToMessageId,
+                        caption: "Expenses day by day for the month",
+                        cancellationToken: cancellationToken);
+
+                    File.Delete(exportFileName);
+                    break;
+                }
+                default:
+                    throw new Exception($"Unknown command result type: {commandResult.GetType()}");
+            }
+        }
+
+        private string GetExpensesParsingAnswerText(ExpensesParsingResult expensesParsingResult)
         {
             var parsedExpenses = expensesParsingResult.ParsedExpenses;
             var unparsedLines = expensesParsingResult.UnparsedLines;

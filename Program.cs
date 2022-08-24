@@ -17,7 +17,7 @@ namespace ExpensesTelegramBot
             ConfigureServices(serviceCollection);
             var serviceProvider =  serviceCollection.BuildServiceProvider();
             var bot = serviceProvider.GetService<Bot>();
-            await bot.Run();            
+            await bot!.Run();            
         }
 
         private static void ConfigureServices(IServiceCollection serviceCollection)
@@ -28,6 +28,7 @@ namespace ExpensesTelegramBot
                 .AddSingleton<IExpenseParser, ExpenseParser>()
                 .AddSingleton<IExpensePrinter, ExpensePrinter>()
                 .AddScoped<IUpdateHandler, UpdateHandler>()
+                .AddSingleton<ICommandCreator, CommandCreator>()
                 ;
         }
     }

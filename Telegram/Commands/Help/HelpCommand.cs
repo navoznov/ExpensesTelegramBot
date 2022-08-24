@@ -2,18 +2,16 @@ using System.IO;
 
 namespace ExpensesTelegramBot.Telegram.Commands.Help
 {
-    public class HelpCommand : Command<HelpCommandInput, CommandTextResult>
+    public class HelpCommand : Command
     {
-        public const string NAME = "help";
-
         public HelpCommand(HelpCommandInput input) : base(input)
         {
         }
 
-        public override CommandTextResult Execute()
+        public override CommandResult Execute()
         {
-            var text = File.ReadAllText("Resources/Help/helpCommand.md");
-            return new CommandTextResult(text);
+            var markdownText = File.ReadAllText("Resources/Help/helpCommand.md");
+            return new CommandMarkdownTextResult(markdownText);
         }
     }
 }
