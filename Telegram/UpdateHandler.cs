@@ -10,11 +10,6 @@ using ExpensesTelegramBot.Repositories;
 using ExpensesTelegramBot.Services;
 using ExpensesTelegramBot.Telegram.Commands;
 using Telegram.Bot;
-using ExpensesTelegramBot.Telegram.Commands.Export;
-using ExpensesTelegramBot.Telegram.Commands.Get;
-using ExpensesTelegramBot.Telegram.Commands.GetAll;
-using ExpensesTelegramBot.Telegram.Commands.Help;
-using ExpensesTelegramBot.Telegram.Commands.Sum;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.InputFiles;
@@ -28,14 +23,17 @@ namespace ExpensesTelegramBot.Telegram
         private readonly IExpenseParser _expenseParser;
         private readonly IExpensePrinter _expensePrinter;
         private readonly ICommandCreator _commandCreator;
+        private readonly IUserSettingsRepository _userSettingsRepository;
 
         public UpdateHandler(IExpensesRepository expensesRepository, IExpenseParser expenseParser,
-            IExpensePrinter expensePrinter, ICommandCreator commandCreator)
+            IExpensePrinter expensePrinter, ICommandCreator commandCreator, 
+            IUserSettingsRepository userSettingsRepository)
         {
             _expensesRepository = expensesRepository;
             _expenseParser = expenseParser;
             _expensePrinter = expensePrinter;
             _commandCreator = commandCreator;
+            _userSettingsRepository = userSettingsRepository;
         }
 
         public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update,
@@ -76,8 +74,10 @@ namespace ExpensesTelegramBot.Telegram
                 return;
             }
 
-            var expensesParsingResult = await _expenseParser.TryParse(messageText);
-            _expensesRepository.Save(chatId, expensesParsingResult.ParsedExpenses);
+            var userSettingsInfo = _userSettingsRepository.GetUserSettingsInfo(chatId);
+            var expensesParsingResult = await _expenseParser.TryParse(messageText, userSettingsInfo.TimeZoneInfo);
+            var parsedExpenses = expensesParsingResult.ParsedExpenses;
+            _expensesRepository.Save(chatId, parsedExpenses);
             var expensesParsingAnswerText = GetExpensesParsingAnswerText(expensesParsingResult);
             await botClient.SendTextMessageAsync(chatId: chatId, text: expensesParsingAnswerText,
                 replyToMessageId: replyToMessageId, cancellationToken: cancellationToken);

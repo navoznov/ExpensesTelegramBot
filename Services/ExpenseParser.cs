@@ -10,7 +10,7 @@ namespace ExpensesTelegramBot.Services
 {
     public class ExpenseParser : IExpenseParser
     {
-        public async Task<ExpensesParsingResult> TryParse(string input)
+        public async Task<ExpensesParsingResult> TryParse(string input, TimeZoneInfo userTimeZoneInfo)
         {
             var isSuccess = true;
             var parsedExpenses = new List<Expense>();
@@ -48,9 +48,11 @@ namespace ExpensesTelegramBot.Services
                 var multiplier = multiplierStr?.ToUpper() == "K" ? 1_000 : 1;
 
                 var date = ParseDateWithMultiplyFormats(match.Groups["date"]?.Value);
+                date ??= TimeZoneInfo.ConvertTime(DateTime.UtcNow, userTimeZoneInfo);
+            
                 var description = match.Groups["description"]?.Value.Trim();
                 
-                var expense = new Expense(money * multiplier, date, description);
+                var expense = new Expense(money * multiplier, date.Value.Date, description);
                 parsedExpenses.Add(expense);
             }
             
@@ -64,7 +66,7 @@ namespace ExpensesTelegramBot.Services
                 return null;
             }
 
-            var formats = new[] {"yyyy-MM-dd", "yyyy.MM.dd"};
+            var formats = new[] {"yyyy-MM-dd", "yyyy.MM.dd", "yyyy/MM/dd"};
             foreach (var format in formats)
             {
                 if (DateTime.TryParseExact(input, format, CultureInfo.InvariantCulture, DateTimeStyles.None,

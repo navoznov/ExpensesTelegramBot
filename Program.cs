@@ -29,6 +29,7 @@ namespace ExpensesTelegramBot
                 .AddSingleton<IExpensePrinter, ExpensePrinter>()
                 .AddScoped<IUpdateHandler, UpdateHandler>()
                 .AddSingleton<ICommandCreator, CommandCreator>()
+                .AddSingleton<IUserSettingsRepository, FileUserSettingsRepository>()
                 ;
         }
     }
