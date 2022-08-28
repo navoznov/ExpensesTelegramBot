@@ -10,9 +10,9 @@ namespace ExpensesTelegramBot.Models
     
         public string? Description { get; set; }
 
-        public Expense(decimal money, DateTime? date, string? description)
+        public Expense(decimal money, DateTime date, string? description)
         {
-            Date = date ?? DateTime.Now.Date;
+            Date = date;
             Money = money;
             Description = description;
         }

@@ -14,13 +14,17 @@ namespace ExpensesTelegramBot.Repositories
     public class CsvExpensesRepository : IExpensesRepository
     {
         private readonly IExpensePrinter _expensePrinter;
+        private readonly IUserSettingsRepository _userSettingsRepository;
         private const string CSV_FILES_STORAGE_FOLDER_NAME = "data";
         private const string DATE_FORMAT = "yyyy-MM-dd";
         private const char CSV_DELIMITER = ';';
+        private const string EXPENSES_FILENAME = "expenses.csv";
 
-        public CsvExpensesRepository(IExpensePrinter expensePrinter)
+
+        public CsvExpensesRepository(IExpensePrinter expensePrinter, IUserSettingsRepository userSettingsRepository)
         {
             _expensePrinter = expensePrinter;
+            _userSettingsRepository = userSettingsRepository;
             if (!Directory.Exists(CSV_FILES_STORAGE_FOLDER_NAME))
             {
                 Directory.CreateDirectory(CSV_FILES_STORAGE_FOLDER_NAME);
@@ -29,16 +33,83 @@ namespace ExpensesTelegramBot.Repositories
 
         public void Save(long chatId, Expense[] expenses)
         {
-            var expensesGroupedByFileName = expenses
-                .GroupBy(e => GetFileName(e.Date.Year, e.Date.Month));
+            var filePath = GetFilePath(chatId);
+            // TODO: remove hack
+            CopyExpensesToNewFile(chatId, filePath);
+            var orderedExpenses = expenses.OrderBy(e => e.Date).ToArray();
+            var csv = GetExpensesCsv(orderedExpenses);
+            AppendToFile(filePath, csv);
+        }
 
-            foreach (var expensesGroup in expensesGroupedByFileName)
+        public Expense[] GetLastExpenses(long chatId, int count)
+        {
+            var filePath = GetFilePath(chatId);
+            if (!File.Exists(filePath))
             {
+                // TODO: remove hack
+                CopyExpensesToNewFile(chatId, filePath);
+                if (!File.Exists(filePath))
+                {
+                    return Array.Empty<Expense>();
+                }
+            }
 
-                var fileName = expensesGroup!.Key;
-                var filePath = GetFilePath(chatId, fileName);
-                var csv = GetExpensesCsv(expensesGroup);
-                AppendToFile(filePath, csv);
+            var utcOffset = GetUserTimeZoneUtcOffset(chatId);
+            var expenses = GetExpensesFromFile(filePath, utcOffset);
+            return expenses
+                .OrderByDescending(e => e.Date)
+                .Take(count)
+                .ToArray();
+        }
+
+        public Expense[] GetAll(long chatId, int year, int month)
+        {
+            var filePath = GetFilePath(chatId);
+            if (!File.Exists(filePath))
+            {
+                // TODO: remove hack
+                CopyExpensesToNewFile(chatId, filePath);
+                if (!File.Exists(filePath))
+                {
+                    return Array.Empty<Expense>();
+                }
+            }
+
+            var utcOffset = GetUserTimeZoneUtcOffset(chatId);
+            var expenses = GetExpensesFromFile(filePath, utcOffset);
+            return expenses
+                .Where(e => e.Date.Year == year && e.Date.Month == month)
+                .OrderBy(e => e.Date)
+                .ToArray();
+        }
+
+        private TimeSpan GetUserTimeZoneUtcOffset(long chatId)
+        {
+            var userSettingsInfo = _userSettingsRepository.GetUserSettingsInfo(chatId);
+            return userSettingsInfo.TimeZoneInfo.BaseUtcOffset;
+        }
+
+        private static string GetFilePath(long chatId)
+        {
+            var directoryPath = Path.Combine(CSV_FILES_STORAGE_FOLDER_NAME, chatId.ToString());
+            if (!Directory.Exists(directoryPath))
+            {
+                Directory.CreateDirectory(directoryPath);
+            }
+
+            return Path.Combine(directoryPath, EXPENSES_FILENAME);
+        }
+
+        private static void CopyExpensesToNewFile(long chatId, string? filePath)
+        {
+            if (File.Exists(filePath)) return;
+
+            // HACK: copy saved expenses to new file
+            var oldFilePath = Path.Combine(CSV_FILES_STORAGE_FOLDER_NAME, chatId.ToString(), "2022-08.csv");
+            if (File.Exists(oldFilePath))
+            {
+                File.Copy(oldFilePath, filePath);
+                File.Delete(oldFilePath);
             }
         }
 
@@ -54,72 +125,6 @@ namespace ExpensesTelegramBot.Repositories
             return csvTextBuilder.ToString();
         }
 
-        public Expense[] GetAll(long chatId, int year, int month)
-        {
-            var fileName = GetFileName(year, month);
-            var filePath = GetFilePath(chatId, fileName);
-            if (!File.Exists(filePath))
-            {
-                return Array.Empty<Expense>();
-            }
-
-            var expenses = GetExpensesFromFile(filePath);
-            return expenses
-                .Where(e => e.Date.Year == year && e.Date.Month == month)
-                .OrderBy(e => e.Date)
-                .ToArray();
-        }
-
-        public Expense[] GetLastExpenses(long chatId, int count)
-        {
-            var directoryPath = Path.Combine(".", CSV_FILES_STORAGE_FOLDER_NAME, chatId.ToString());
-            if (!Directory.Exists(directoryPath))
-            {
-                return Array.Empty<Expense>();
-            }
-            
-            var directoryInfo = new DirectoryInfo(directoryPath);
-            var fileNames = directoryInfo.GetFiles().Select(fi => fi.Name).ToArray();
-
-            const string EXPENSES_DATA_FILE_PATTERN = @"^\d\d\d\d-\d\d\.csv$";
-            var regex = new Regex(EXPENSES_DATA_FILE_PATTERN);
-            var matchedFileNames = fileNames.Where(fn => regex.IsMatch(fn))
-                .OrderByDescending(fn => fn)
-                .ToArray();
-            var result = new List<Expense>();
-            foreach (var fileName in matchedFileNames)
-            {
-                var filePath = GetFilePath(chatId, fileName);
-                var allFileRecords = GetExpensesFromFile(filePath);
-                var expensesToResult = allFileRecords
-                    .OrderByDescending(e => e.Date)
-                    .Take(count - result.Count);
-                result.AddRange(expensesToResult);
-                if (result.Count == count)
-                {
-                    break;
-                }
-            }
-
-            return result.ToArray();
-        }
-
-        private static string GetFileName(int year, int month)
-        {
-            var date = new DateTime(year, month, 1);
-            return $"{date:yyyy-MM}.csv";
-        }
-
-        private static string GetFilePath(long chatId, string fileName)
-        {
-            var directoryPath = Path.Combine(CSV_FILES_STORAGE_FOLDER_NAME, chatId.ToString());
-            if (!Directory.Exists(directoryPath))
-            {
-                Directory.CreateDirectory(directoryPath);
-            }
-            return Path.Combine(directoryPath, fileName);
-        }
-
         private static void AppendToFile(string filePath, string text)
         {
             using var stream = File.Open(filePath, FileMode.Append);
@@ -127,13 +132,13 @@ namespace ExpensesTelegramBot.Repositories
             writer.WriteAsync(text);
         }
 
-        private Expense[] GetExpensesFromFile(string fileName)
+        private Expense[] GetExpensesFromFile(string filePath, TimeSpan utcOffset)
         {
-            var lines = File.ReadAllLines(fileName);
-            return lines.Select(ParseCsvExpense).ToArray();
+            var lines = File.ReadAllLines(filePath);
+            return lines.Select(s => ParseCsvExpense(s, utcOffset)).ToArray();
         }
 
-        Expense ParseCsvExpense(string line)
+        Expense ParseCsvExpense(string line, TimeSpan utcOffset)
         {
             var fields = line.Split(CSV_DELIMITER);
             if (fields.Length < 2)
@@ -148,6 +153,8 @@ namespace ExpensesTelegramBot.Repositories
                 throw new Exception($"Parsing error. Invalid date format {dateStr}");
             }
 
+            var dateTimeOffset = new DateTimeOffset(date, utcOffset);
+            date = dateTimeOffset.Date;
             var moneyStr = fields[1];
             if (!decimal.TryParse(moneyStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var money))
             {

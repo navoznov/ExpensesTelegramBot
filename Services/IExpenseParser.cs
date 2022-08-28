@@ -1,10 +1,10 @@
+using System;
 using System.Threading.Tasks;
-using ExpensesTelegramBot.Models;
 
 namespace ExpensesTelegramBot.Services
 {
     public interface IExpenseParser
     {
-        Task<ExpensesParsingResult> TryParse(string input);
+        Task<ExpensesParsingResult> TryParse(string input, TimeZoneInfo userTimeZoneInfo);
     }
 }
