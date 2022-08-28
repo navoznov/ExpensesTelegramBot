@@ -1,6 +1,8 @@
 using System;
 using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
+using ExpensesTelegramBot.Exceptions;
 
 namespace ExpensesTelegramBot.Telegram.Commands.SetTimeZone
 {
@@ -17,15 +19,9 @@ namespace ExpensesTelegramBot.Telegram.Commands.SetTimeZone
         {
             setTimeZoneCommandInput = null;
 
-            var offsetFormats = new[] {"\\+H", "\\-H","\\+H:mm", "\\-H:mm"};
-            if (!DateTimeOffset.TryParseExact(input, offsetFormats, CultureInfo.InvariantCulture,
-                DateTimeStyles.None, out var dateTimeOffset))
-            {
-                return false;
-            }
-
+            var timeZoneOffset = ParseTimeZoneOffset(input);
             var timeZoneInfos = TimeZoneInfo.GetSystemTimeZones()
-                .Where(z => z.BaseUtcOffset == dateTimeOffset.Offset)
+                .Where(x=>x.BaseUtcOffset == timeZoneOffset)
                 .ToArray();
             if (!timeZoneInfos.Any())
             {
@@ -36,6 +32,25 @@ namespace ExpensesTelegramBot.Telegram.Commands.SetTimeZone
             setTimeZoneCommandInput = new SetTimeZoneCommandInput(timeZoneInfos.First());
             return true;
         }
+        
+        private static TimeSpan ParseTimeZoneOffset(string input)
+        {
+            // 8, +8, -8, +08, -08, +08:30, -8:30
+            const string? PATTERN = @"(?<hours>[\-\+]?\d\d?)(?:\:(?<minutes>\d\d))?";
+            var regex = new Regex(PATTERN);
+            if (!regex.IsMatch(input))
+            {
+                throw new ParsingException($"Invalid time zone offset: {input}");
+            }
 
+            var match = regex.Match(input);
+            var hoursStr = match.Groups["hours"].Value;
+            var hours = int.Parse(hoursStr);
+
+            var minutesStr = match.Groups["minutes"]?.Value;
+            var minutes = string.IsNullOrEmpty(minutesStr) ? 0 : int.Parse(minutesStr);
+            var offset = new TimeSpan(hours, minutes, 0);
+            return offset;
+        }
     }
 }
